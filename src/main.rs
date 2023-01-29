@@ -8,42 +8,17 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
-use std::cmp::{max, min};
 use std::f32::consts::PI;
 use std::time::Instant;
-use std::{
-    mem,
-    ptr,
-};
-use std::ffi::{c_void};
 
 use camera::Camera;
 use gl::types::*;
 use glfw::{Action, Context, Key};
-use model::{Model, INDICESA, VERTICESA, ModelBuilder};
-use na::{Matrix4, Vector3, Rotation3, Projective3, Perspective3, Translation3, vector, Unit};
+use model::{INDICESA, VERTICESA, ModelBuilder};
+use na::{Vector3, Rotation3, Perspective3, Translation3, vector, Unit};
 use rand::Rng;
 use shader::Shader;
 use tracing::{debug, Level};
-
-const VERTICES: [GLfloat; 12] = [
-    0.5,  0.5, 0.0,  // top right
-    0.5, -0.5, 0.0,  // bottom right
-   -0.5, -0.5, 0.0,  // bottom left
-   -0.5,  0.5, 0.0,   // top left 
-];
-
-
-const VERTICESB: [GLfloat; 24] = [
-    // Position         Color           Texture
-    0.0, -1.0, 0.0,   1.0, 0.0, 0.0,  1.0, 0.0,   // bottom right
-   -1.0, -1.0, 0.0,   0.0, 1.0, 0.0,  0.0, 0.0,   // bottom left
-   -1.0,  0.0, 0.0,   0.0, 0.0, 1.0,  0.0, 1.0,   // top left 
-];
-
-const INDICESB: [GLuint; 3] = [
-    0, 1, 2,   // second triangle
-];
 
 fn main() {
     // Log setup
@@ -102,9 +77,7 @@ fn main() {
     let world_space_operation = model.world_space_operation();
     model = model.add_uniform_mat4(transformation_uniform, world_space_operation).unwrap();
 
-    unsafe {
-        gl::Enable(gl::DEPTH_TEST);
-    }
+    unsafe {gl::Enable(gl::DEPTH_TEST);}
 
     let mut rng = rand::thread_rng();
     let mut random_offsets = [0.0; 10];

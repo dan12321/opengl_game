@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::{
     ptr,
     str,
-    mem,
 };
-use std::ffi::{CString, NulError, c_void};
+use std::ffi::{CString, NulError};
 use std::fs::OpenOptions;
 use std::io::{Error as IoError, Read};
 

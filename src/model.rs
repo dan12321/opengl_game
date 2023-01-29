@@ -6,7 +6,7 @@ use std::{
 };
 
 use gl::types::*;
-use na::{matrix, Matrix4, vector, Vector4, Translation3};
+use na::{Matrix4, Translation3};
 use tracing::debug;
 
 pub struct Model<const R: usize, const S: usize> {
