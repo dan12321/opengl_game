@@ -32,7 +32,7 @@ impl<const R: usize, const S: usize> Model<R, S> {
             for i in 0..self.textures.len() {
                 match self.textures[i] {
                     Some(t) => {
-                        gl::ActiveTexture(TEXTURES[i]);
+                        gl::ActiveTexture(GL_TEXTURES[i]);
                         gl::BindTexture(gl::TEXTURE_2D, t);
                     },
                     None => break,
@@ -237,7 +237,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
     }
 }
 
-pub const VERTICESA: [GLfloat; 40] = [
+pub const CUBE_VERTICES: [GLfloat; 40] = [
     0.5,  0.5, 0.5, 1.0, 1.0, // top right forward
     0.5, -0.5, 0.5, 1.0, 0.0,  // bottom right forward
    -0.5,  0.5, 0.5, 0.0, 1.0,   // top left forward
@@ -248,7 +248,7 @@ pub const VERTICESA: [GLfloat; 40] = [
    -0.5,  -0.5, -0.5, 1.0, 0.0,   // bottom left back
 ];
 
-pub const INDICESA: [GLuint; 36] = [
+pub const CUBE_INDICES: [GLuint; 36] = [
     0, 1, 2, // front
     2, 1, 3, // front
     0, 2, 4, // top
@@ -263,7 +263,7 @@ pub const INDICESA: [GLuint; 36] = [
     6, 5, 7, // back
 ];
 
-const TEXTURES: [GLenum; 32] = [
+const GL_TEXTURES: [GLenum; 32] = [
     gl::TEXTURE0,
     gl::TEXTURE1,
     gl::TEXTURE2,
