@@ -2,11 +2,12 @@ use super::shader::Shader;
 
 use std::{
     mem,
-    ptr, ffi::NulError,
+    ptr, ffi::{NulError, c_void},
 };
 
 use gl::types::*;
 use na::{matrix, Matrix4, vector, Vector4, Translation3};
+use tracing::debug;
 
 pub struct Model<const R: usize, const S: usize> {
     pub vertices: [GLfloat; R],
@@ -17,6 +18,7 @@ pub struct Model<const R: usize, const S: usize> {
     vao: u32,
     vbo: u32,
     ebo: u32,
+    textures: [Option<u32>; 32],
 }
 
 impl<const R: usize, const S: usize> Model<R, S> {
@@ -26,6 +28,16 @@ impl<const R: usize, const S: usize> Model<R, S> {
 
     pub fn draw(&self) {
         unsafe {
+            self.shader.use_program();
+            for i in 0..self.textures.len() {
+                match self.textures[i] {
+                    Some(t) => {
+                        gl::ActiveTexture(TEXTURES[i]);
+                        gl::BindTexture(gl::TEXTURE_2D, t);
+                    },
+                    None => break,
+                }
+            }
             gl::BindVertexArray(self.vao);
             gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&self.indices), gl::STATIC_DRAW);
             gl::DrawElements(gl::TRIANGLES, self.indices.len() as i32, gl::UNSIGNED_INT, ptr::null());
@@ -99,7 +111,9 @@ pub struct ModelBuilder<const R: usize, const S: usize> {
     indices: [GLuint; S],
     shader: Shader,
     transform: Option<Translation3<GLfloat>>,
-    rotation: Option<Matrix4<GLfloat>>
+    rotation: Option<Matrix4<GLfloat>>,
+    textures: [Option<String>; 32],
+    textures_count: usize,
 }
 
 impl<const R: usize, const S: usize> ModelBuilder<R, S> {
@@ -110,6 +124,8 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             shader,
             transform: None,
             rotation: None,
+            textures: Default::default(),
+            textures_count: 0,
         }
     }
 
@@ -120,6 +136,8 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             shader: self.shader,
             transform: Some(transform),
             rotation: self.rotation,
+            textures: self.textures,
+            textures_count: self.textures_count,
         }
     }
 
@@ -130,8 +148,27 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             shader: self.shader,
             transform: self.transform,
             rotation: Some(rotation),
+            textures: self.textures,
+            textures_count: self.textures_count,
         }
     }
+
+    pub fn add_texture(mut self, texture: String) -> Self {
+        if self.textures_count < 32 {
+            self.textures[self.textures_count] = Some(texture);
+            self.textures_count += 1;
+        }
+        Self {
+            vertices: self.vertices,
+            indices: self.indices,
+            shader: self.shader,
+            transform: self.transform,
+            rotation: self.rotation,
+            textures: self.textures,
+            textures_count: self.textures_count,
+        }
+    }
+
 
     pub fn init(self) -> Model<R, S> {
         let mut vao = 0;
@@ -147,8 +184,37 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&self.indices), gl::STATIC_DRAW);
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
     
-            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (3 * mem::size_of::<GLfloat>()) as i32, ptr::null());
+            let stride = (3 + 2) * mem::size_of::<GLfloat>() as i32;
+            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
             gl::EnableVertexAttribArray(0);
+            for i in 0..self.textures_count {
+                let first_position = (3 + 2 * i) * mem::size_of::<GLfloat>();
+                debug!(first_position=first_position, "added texture");
+                gl::VertexAttribPointer((i+1) as u32, 2, gl::FLOAT, gl::FALSE, stride, first_position as *mut c_void);
+                gl::EnableVertexAttribArray((i+1) as u32);
+            }
+        }
+
+        let mut textures: [Option<u32>; 32] = Default::default();
+        for i in 0..self.textures.len() {
+            match &self.textures[i] {
+                Some(t) => {
+                    let mut texture = 0;
+                    let texture_image = image::open(t).unwrap();
+                    // Uses native endian. Not sure if this always matches what opengl expects
+                    let texture_bytes = texture_image.as_bytes();
+                
+                    unsafe {
+                        gl::GenTextures(1, &mut texture);
+                        gl::BindTexture(gl::TEXTURE_2D, texture);
+                        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGB as i32, texture_image.width() as i32, texture_image.height() as i32, 0, gl::RGB, gl::UNSIGNED_BYTE, &texture_bytes[0] as *const _ as *const c_void);
+                        gl::GenerateMipmap(gl::TEXTURE_2D);
+                    }
+
+                    textures[i] = Some(texture);
+                },
+                None => break,
+            }
         }
 
         Model {
@@ -165,20 +231,21 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             shader: self.shader,
             vao,
             vbo,
-            ebo
+            ebo,
+            textures,
         }
     }
 }
 
-pub const VERTICESA: [GLfloat; 24] = [
-    0.5,  0.5, 0.5, // top right forward
-    0.5, -0.5, 0.5,  // bottom right forward
-   -0.5,  0.5, 0.5,   // top left forward
-   -0.5,  -0.5, 0.5,   // bottom left forward
-    0.5,  0.5, -0.5, // top right back
-    0.5, -0.5, -0.5,  // bottom right back
-   -0.5,  0.5, -0.5,   // top left back
-   -0.5,  -0.5, -0.5,   // bottom left back
+pub const VERTICESA: [GLfloat; 40] = [
+    0.5,  0.5, 0.5, 1.0, 1.0, // top right forward
+    0.5, -0.5, 0.5, 1.0, 0.0,  // bottom right forward
+   -0.5,  0.5, 0.5, 0.0, 1.0,   // top left forward
+   -0.5,  -0.5, 0.5, 0.0, 0.0,   // bottom left forward
+    0.5,  0.5, -0.5, 0.0, 1.0, // top right back
+    0.5, -0.5, -0.5, 0.0, 0.0,  // bottom right back
+   -0.5,  0.5, -0.5, 1.0, 1.0,  // top left back
+   -0.5,  -0.5, -0.5, 1.0, 0.0,   // bottom left back
 ];
 
 pub const INDICESA: [GLuint; 36] = [
@@ -194,4 +261,39 @@ pub const INDICESA: [GLuint; 36] = [
     6, 3, 7, // left
     4, 5, 6, // back
     6, 5, 7, // back
+];
+
+const TEXTURES: [GLenum; 32] = [
+    gl::TEXTURE0,
+    gl::TEXTURE1,
+    gl::TEXTURE2,
+    gl::TEXTURE3,
+    gl::TEXTURE4,
+    gl::TEXTURE5,
+    gl::TEXTURE6,
+    gl::TEXTURE7,
+    gl::TEXTURE8,
+    gl::TEXTURE9,
+    gl::TEXTURE10,
+    gl::TEXTURE11,
+    gl::TEXTURE12,
+    gl::TEXTURE13,
+    gl::TEXTURE14,
+    gl::TEXTURE15,
+    gl::TEXTURE16,
+    gl::TEXTURE17,
+    gl::TEXTURE18,
+    gl::TEXTURE19,
+    gl::TEXTURE20,
+    gl::TEXTURE21,
+    gl::TEXTURE22,
+    gl::TEXTURE23,
+    gl::TEXTURE24,
+    gl::TEXTURE25,
+    gl::TEXTURE26,
+    gl::TEXTURE27,
+    gl::TEXTURE28,
+    gl::TEXTURE29,
+    gl::TEXTURE30,
+    gl::TEXTURE31,
 ];

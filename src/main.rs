@@ -89,8 +89,10 @@ fn main() {
     let mut camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
     let mut view = camera.transform();
 
-    let orange_shader_program = Shader::new("assets/orange_shader.vert", "assets/orange_shader.frag").unwrap();
-    let mut model = ModelBuilder::new(VERTICESA.into(), INDICESA.into(), orange_shader_program).init()
+    let texture_shader_program = Shader::new("assets/shaders/texture_shader.vert", "assets/shaders/texture_shader.frag").unwrap();
+    let mut model = ModelBuilder::new(VERTICESA.into(), INDICESA.into(), texture_shader_program)
+        .add_texture(String::from("assets/textures/wall.jpg"))
+        .init()
         .add_uniform1f(offset_uniform, offset)
         .unwrap()
         .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
@@ -100,52 +102,9 @@ fn main() {
     let world_space_operation = model.world_space_operation();
     model = model.add_uniform_mat4(transformation_uniform, world_space_operation).unwrap();
 
-    let mut blue_shader_program = Shader::new("assets/blue_shader.vert", "assets/blue_shader.frag").unwrap();
-
-    // Vertex Objects
-    let mut vao_blue = 0;
-    let mut vbo_blue = 0;
-    let mut ebo_blue = 0;
-    unsafe {
-        gl::GenVertexArrays(1, &mut vao_blue);
-        gl::GenBuffers(1, &mut vbo_blue);
-        gl::GenBuffers(1, &mut ebo_blue);
-        gl::BindVertexArray(vao_blue);
-        gl::BindBuffer(gl::ARRAY_BUFFER, vbo_blue);
-        gl::BufferData(gl::ARRAY_BUFFER, (VERTICESB.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, mem::transmute(&VERTICESB), gl::STATIC_DRAW);
-        gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (INDICESB.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&INDICESB), gl::STATIC_DRAW);
-        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo_blue);
-
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, (8 * mem::size_of::<GLfloat>()) as i32, ptr::null());
-        gl::EnableVertexAttribArray(0);
-        gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, (8 * mem::size_of::<GLfloat>()) as i32, (3 * mem::size_of::<GLfloat>()) as *mut c_void);
-        gl::EnableVertexAttribArray(1);
-        gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, (8 * mem::size_of::<GLfloat>()) as i32, (6 * mem::size_of::<GLfloat>()) as *mut c_void);
-        gl::EnableVertexAttribArray(2);
-    }
-
-    // Texture
-    let mut texture1 = 0;
-    let texture_path = "assets/scifiwall.jpg";
-    let texture_image = image::open(texture_path).unwrap();
-    // Uses native endian. Not sure if this always matches what opengl expects
-    let texture_bytes = texture_image.as_bytes();
-
     unsafe {
         gl::Enable(gl::DEPTH_TEST);
-        gl::GenTextures(1, &mut texture1);
-        gl::BindTexture(gl::TEXTURE_2D, texture1);
-        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGB as i32, texture_image.width() as i32, texture_image.height() as i32, 0, gl::RGB, gl::UNSIGNED_BYTE, &texture_bytes[0] as *const _ as *const c_void);
-        gl::GenerateMipmap(gl::TEXTURE_2D);
     }
-
-    blue_shader_program.use_program();
-    blue_shader_program = blue_shader_program.add_uniform1i("aTexture", 0)
-        .unwrap()
-        .add_uniform1i("bTexture", 1)
-        .unwrap()
-        .add_uniform1f(offset_uniform, offset)
-        .unwrap();
 
     let mut rng = rand::thread_rng();
     let mut random_offsets = [0.0; 10];
@@ -231,7 +190,6 @@ fn main() {
         }
 
         clear();
-        model.shader.use_program();
         camera.target = model.transform.vector;
         view = camera.transform();
         for i in 0..random_offsets.len() {
@@ -250,19 +208,6 @@ fn main() {
             model.set_uniform_mat4(view_uniform, view).unwrap();
             model.draw();
         }
-
-        // blue_shader_program.use_program();
-        // blue_shader_program.set_uniform1f(offset_uniform, offset).unwrap();
-        // unsafe {
-        //     gl::ActiveTexture(gl::TEXTURE0);
-        //     gl::BindTexture(gl::TEXTURE_2D, texture1);
-        //     gl::ActiveTexture(gl::TEXTURE1);
-        //     gl::BindTexture(gl::TEXTURE_2D, texture2);
-        //     gl::BindVertexArray(vao_blue);
-        //     gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (INDICESB.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&INDICESB), gl::STATIC_DRAW);
-        //     gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
-        //     gl::BindVertexArray(0);
-        // }
     }
 }
 

@@ -19,6 +19,7 @@ pub struct Shader {
     uniform1is: HashMap<String, Uniform<i32>>,
     uniform2fs: HashMap<String, Uniform<(f32, f32)>>,
     uniform_matrix4s: HashMap<String, Uniform<Matrix4<f32>>>,
+
 }
 
 impl Shader {
@@ -53,11 +54,12 @@ impl Shader {
         });
     }
 
-    pub fn use_program(&self) {
-        unsafe { gl::UseProgram(self.id) };
+    pub unsafe fn use_program(&self) {
+        gl::UseProgram(self.id);
     }
 
     pub fn add_uniform1f(mut self, name: &str, value: f32) -> Result<Self, NulError> {
+        unsafe { gl::UseProgram(self.id) };
         let name_cstring = CString::new(name.as_bytes()).unwrap();
         let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
         unsafe {gl::Uniform1f(location, value); }
@@ -76,6 +78,7 @@ impl Shader {
     /// Sets the value of the uniform in the shader
     /// Returns the old value or none if the uniform doesn't exist
     pub fn set_uniform1f(&mut self, name: &str, value: f32) -> Option<f32> {
+        unsafe { gl::UseProgram(self.id) };
         let old_uniform = self.uniform1fs.get(name)?;
         unsafe { gl::Uniform1f(old_uniform.location, value); }
         let new_uniform = Uniform::new(old_uniform.location, value);
@@ -87,6 +90,7 @@ impl Shader {
 
 
     pub fn add_uniform1i(mut self, name: &str, value: i32) -> Result<Self, NulError> {
+        unsafe { gl::UseProgram(self.id) };
         let name_cstring = CString::new(name.as_bytes()).unwrap();
         let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
         unsafe {gl::Uniform1i(location, value); }
@@ -105,6 +109,7 @@ impl Shader {
     /// Sets the value of the uniform in the shader
     /// Returns the old value or none if the uniform doesn't exist
     pub fn set_uniform1i(&mut self, name: &str, value: i32) -> Option<i32> {
+        unsafe { gl::UseProgram(self.id) };
         let old_uniform = self.uniform1is.get(name)?;
         unsafe { gl::Uniform1i(old_uniform.location, value); }
         let new_uniform = Uniform::new(old_uniform.location, value);
@@ -115,6 +120,7 @@ impl Shader {
     }
 
     pub fn add_uniform_mat4(mut self, name: &str, value: Matrix4<f32>) -> Result<Self, NulError> {
+        unsafe { gl::UseProgram(self.id) };
         let name_cstring = CString::new(name.as_bytes()).unwrap();
         let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
         let data = value.as_ptr();
@@ -134,6 +140,7 @@ impl Shader {
     /// Sets the value of the uniform in the shader
     /// Returns the old value or none if the uniform doesn't exist
     pub fn set_uniform_mat4(&mut self, name: &str, value: Matrix4<f32>) -> Option<Matrix4<f32>> {
+        unsafe { gl::UseProgram(self.id) };
         let old_uniform = self.uniform_matrix4s.get(name)?;
         let data = value.as_ptr();
         unsafe { gl::UniformMatrix4fv(old_uniform.location, 1, gl::FALSE,  data) }
@@ -145,6 +152,7 @@ impl Shader {
     }
 
     pub fn add_uniform2f(mut self, name: &str, value: (f32, f32)) -> Result<Self, NulError> {
+        unsafe { gl::UseProgram(self.id) };
         let name_cstring = CString::new(name.as_bytes()).unwrap();
         let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
         unsafe { gl::Uniform2f(location, value.0, value.1); }
@@ -163,6 +171,7 @@ impl Shader {
     /// Sets the value of the uniform in the shader
     /// Returns the old value or none if the uniform doesn't exist
     pub fn set_uniform2f(&mut self, name: &str, value: (f32, f32)) -> Option<(f32, f32)> {
+        unsafe { gl::UseProgram(self.id) };
         let old_uniform = self.uniform2fs.get(name)?;
         unsafe {gl::Uniform2f(old_uniform.location, value.0, value.1); }
         let new_uniform = Uniform::new(old_uniform.location, value);
