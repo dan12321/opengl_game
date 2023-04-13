@@ -3,6 +3,7 @@ mod config;
 mod light;
 mod model;
 mod shader;
+mod shapes;
 
 extern crate glfw;
 extern crate image;
@@ -16,10 +17,11 @@ use std::time::Instant;
 use camera::Camera;
 use gl::types::*;
 use glfw::{Action, Context, Key};
-use model::{CUBE_INDICES, CUBE_VERTICES, ModelBuilder};
+use model::ModelBuilder;
 use na::{Vector3, Rotation3, Perspective3, Translation3, vector, Unit};
 use rand::Rng;
 use shader::Shader;
+use shapes::{TEXTURED_CUBE_VERTICES, TEXTURED_CUBE_INDICES};
 use tracing::{debug, Level};
 
 fn main() {
@@ -67,7 +69,7 @@ fn main() {
     let mut view = camera.transform();
 
     let texture_shader_program = Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
-    let mut model = ModelBuilder::new(CUBE_VERTICES.into(), CUBE_INDICES.into(), texture_shader_program)
+    let mut model = ModelBuilder::new(TEXTURED_CUBE_VERTICES.into(), TEXTURED_CUBE_INDICES.into(), texture_shader_program)
         .add_texture(String::from(config::WALL_TEXTURE))
         .init()
         .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
