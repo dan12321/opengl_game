@@ -1,2 +1,2 @@
-use super::Model;
+use super::model;
 
