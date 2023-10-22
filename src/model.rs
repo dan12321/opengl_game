@@ -75,6 +75,21 @@ impl<const R: usize, const S: usize> Model<R, S> {
         self.shader.set_uniform2f(name, value)
     }
 
+    pub fn add_uniform3f(mut self, name: &str, value: ((f32, f32, f32))) -> Result<Self, NulError> {
+        self.shader = self.shader.add_uniform3f(name, value)?;
+        Ok(self)
+    }
+
+    pub fn get_uniform3f(&self, name: &str) -> Option<((f32, f32, f32))> {
+        self.shader.get_uniform3f(name)
+    }
+
+    /// Sets the value of the uniform in the shader
+    /// Returns the old value or none if the uniform doesn't exist
+    pub fn set_uniform3f(&mut self, name: &str, value: ((f32, f32, f32))) -> Option<((f32, f32, f32))> {
+        self.shader.set_uniform3f(name, value)
+    }
+
     pub fn add_uniform1i(mut self, name: &str, value: i32) -> Result<Self, NulError> {
         self.shader = self.shader.add_uniform1i(name, value)?;
         Ok(self)
@@ -184,7 +199,11 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&self.indices), gl::STATIC_DRAW);
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
     
-            let stride = (3 + 2) * mem::size_of::<GLfloat>() as i32;
+            let stride = if self.textures_count > 0 {
+                (3 + 2) * mem::size_of::<GLfloat>() as i32
+            } else {
+                3 * mem::size_of::<GLfloat>() as i32
+            };
             gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
             gl::EnableVertexAttribArray(0);
             for i in 0..self.textures_count {

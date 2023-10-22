@@ -3,7 +3,7 @@ mod config;
 mod light;
 mod model;
 mod shader;
-mod shapes;
+mod shape;
 
 extern crate glfw;
 extern crate image;
@@ -21,7 +21,7 @@ use model::ModelBuilder;
 use na::{Vector3, Rotation3, Perspective3, Translation3, vector, Unit};
 use rand::Rng;
 use shader::Shader;
-use shapes::{TEXTURED_CUBE_VERTICES, TEXTURED_CUBE_INDICES};
+use shape::{TEXTURED_CUBE_VERTICES, TEXTURED_CUBE_INDICES};
 use tracing::{debug, Level};
 
 fn main() {
@@ -67,6 +67,19 @@ fn main() {
     let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
     let mut camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
     let mut view = camera.transform();
+    let light_shader = Shader::new(config::LIGHT_VERT_SHADER, config::LIGHT_FRAG_SHADER).unwrap();
+    let mut light_model = model::ModelBuilder::new(shape::CUBE_VERTICES, shape::CUBE_INDICES, light_shader)
+        .add_transform(Translation3::new(0.0, 2.0, 0.0))
+        .init()
+        .add_uniform3f("color", (0.0, 1.0, 0.0))
+        .unwrap()
+        .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
+        .unwrap()
+        .add_uniform_mat4(view_uniform, view)
+        .unwrap();
+    let light_wso = light_model.world_space_operation();
+    light_model = light_model.add_uniform_mat4(transformation_uniform, light_wso).unwrap();
+    let mut light = light::Light::new(light_model, 0.0, 1.0, 0.0);
 
     let texture_shader_program = Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let mut model = ModelBuilder::new(TEXTURED_CUBE_VERTICES.into(), TEXTURED_CUBE_INDICES.into(), texture_shader_program)
@@ -209,6 +222,8 @@ fn main() {
             model.set_uniform_mat4(view_uniform, view).unwrap();
             model.draw();
         }
+        light.model.set_uniform_mat4(view_uniform, view).unwrap();
+        light.model.draw();
         last_time = current_time;
     }
 }

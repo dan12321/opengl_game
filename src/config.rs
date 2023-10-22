@@ -1,6 +1,8 @@
 // Assets
 pub const TEXTURE_VERT_SHADER: &'static str = "assets/shaders/texture_shader.vert";
 pub const TEXTURE_FRAG_SHADER: &'static str = "assets/shaders/texture_shader.frag";
+pub const LIGHT_VERT_SHADER: &'static str = "assets/shaders/light_shader.vert";
+pub const LIGHT_FRAG_SHADER: &'static str = "assets/shaders/light_shader.frag";
 pub const WALL_TEXTURE: &'static str = "assets/textures/scifiwall.jpg";
 
 // Movement

@@ -17,6 +17,7 @@ pub struct Shader {
     uniform1fs: HashMap<String, Uniform<f32>>,
     uniform1is: HashMap<String, Uniform<i32>>,
     uniform2fs: HashMap<String, Uniform<(f32, f32)>>,
+    uniform3fs: HashMap<String, Uniform<(f32, f32, f32)>>,
     uniform_matrix4s: HashMap<String, Uniform<Matrix4<f32>>>,
 
 }
@@ -48,6 +49,7 @@ impl Shader {
             id: shader_program,
             uniform1fs: HashMap::new(),
             uniform2fs: HashMap::new(),
+            uniform3fs: HashMap::new(),
             uniform1is: HashMap::new(),
             uniform_matrix4s: HashMap::new(),
         });
@@ -175,6 +177,36 @@ impl Shader {
         unsafe {gl::Uniform2f(old_uniform.location, value.0, value.1); }
         let new_uniform = Uniform::new(old_uniform.location, value);
         match self.uniform2fs.insert(name.into(), new_uniform) {
+            Some(u) => Some(u.value),
+            None => None,
+        }
+    }
+
+    pub fn add_uniform3f(mut self, name: &str, value: (f32, f32, f32)) -> Result<Self, NulError> {
+        unsafe { gl::UseProgram(self.id) };
+        let name_cstring = CString::new(name.as_bytes()).unwrap();
+        let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
+        unsafe { gl::Uniform3f(location, value.0, value.1, value.2); }
+        let uniform = Uniform::new(location, value);
+        self.uniform3fs.insert(name.into(), uniform);
+        Ok(self)
+    }
+
+    pub fn get_uniform3f(&self, name: &str) -> Option<(f32, f32, f32)> {
+        match self.uniform3fs.get(name) {
+            Some(u) => Some(u.value),
+            None => None,
+        }
+    }
+
+    /// Sets the value of the uniform in the shader
+    /// Returns the old value or none if the uniform doesn't exist
+    pub fn set_uniform3f(&mut self, name: &str, value: (f32, f32, f32)) -> Option<(f32, f32, f32)> {
+        unsafe { gl::UseProgram(self.id) };
+        let old_uniform = self.uniform3fs.get(name)?;
+        unsafe {gl::Uniform3f(old_uniform.location, value.0, value.1, value.2); }
+        let new_uniform = Uniform::new(old_uniform.location, value);
+        match self.uniform3fs.insert(name.into(), new_uniform) {
             Some(u) => Some(u.value),
             None => None,
         }
