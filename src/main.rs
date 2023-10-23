@@ -60,6 +60,10 @@ fn main() {
     let transformation_uniform = "transformation";
     let projection_uniform = "projection";
     let view_uniform = "view";
+    let color_uniform = "color";
+    let light_position_uniform = "lightPosition";
+    let light_color_uniform = "lightColor";
+    let light_strenght_uniform = "lightStrength";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
     let znear: GLfloat = 0.1;
@@ -71,7 +75,7 @@ fn main() {
     let mut light_model = model::ModelBuilder::new(shape::CUBE_VERTICES, shape::CUBE_INDICES, light_shader)
         .add_transform(Translation3::new(0.0, 2.0, 0.0))
         .init()
-        .add_uniform3f("color", (0.0, 1.0, 0.0))
+        .add_uniform3f(color_uniform, (0.0, 1.0, 0.0))
         .unwrap()
         .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
         .unwrap()
@@ -79,7 +83,7 @@ fn main() {
         .unwrap();
     let light_wso = light_model.world_space_operation();
     light_model = light_model.add_uniform_mat4(transformation_uniform, light_wso).unwrap();
-    let mut light = light::Light::new(light_model, 0.0, 1.0, 0.0);
+    let mut light = light::Light::new(light_model, 0.2, 1.0, 0.8, 20.0);
 
     let texture_shader_program = Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let mut model = ModelBuilder::new(TEXTURED_CUBE_VERTICES.into(), TEXTURED_CUBE_INDICES.into(), texture_shader_program)
@@ -88,6 +92,12 @@ fn main() {
         .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
         .unwrap()
         .add_uniform_mat4(view_uniform, view)
+        .unwrap()
+        .add_uniform3f(light_color_uniform, light.color.into())
+        .unwrap()
+        .add_uniform3f(light_position_uniform, (light.model.transform.x, light.model.transform.y,  light.model.transform.z))
+        .unwrap()
+        .add_uniform1f(light_strenght_uniform, light.strength)
         .unwrap();
     let world_space_operation = model.world_space_operation();
     model = model.add_uniform_mat4(transformation_uniform, world_space_operation).unwrap();
@@ -220,9 +230,14 @@ fn main() {
             }
             model.set_uniform_mat4(projection_uniform, projection.as_matrix().clone()).unwrap();
             model.set_uniform_mat4(view_uniform, view).unwrap();
+            model.set_uniform3f(light_color_uniform, light.color.into()).unwrap();
+            model.set_uniform3f(light_position_uniform, (light.model.transform.x, light.model.transform.y,  light.model.transform.z)).unwrap();
+            model.set_uniform1f(light_strenght_uniform, light.strength).unwrap();
             model.draw();
         }
         light.model.set_uniform_mat4(view_uniform, view).unwrap();
+        light.model.set_uniform_mat4(transformation_uniform, light.model.world_space_operation()).unwrap();
+        light.model.set_uniform3f(color_uniform, light.color.into()).unwrap();
         light.model.draw();
         last_time = current_time;
     }
