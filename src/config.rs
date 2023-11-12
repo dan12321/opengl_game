@@ -13,4 +13,4 @@ pub const MIN_CAMERA_LONGITUDE: f32 = -0.3;
 pub const MAX_CAMERA_LONGITUDE: f32 = 1.2;
 pub const SCROLL_ZOOM_SCALE: f32 = 1.0 / 5.0;
 pub const MAX_ZOOM: f32 = 10.0;
-pub const MIN_ZOOM: f32 = 0.5;
+pub const MIN_ZOOM: f32 = -5.0;

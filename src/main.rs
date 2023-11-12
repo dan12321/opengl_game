@@ -1,5 +1,6 @@
 mod camera;
 mod config;
+mod controller;
 mod light;
 mod model;
 mod shader;
@@ -15,6 +16,7 @@ use std::f32::consts::PI;
 use std::time::Instant;
 
 use camera::Camera;
+use controller::{Controller, Button};
 use gl::types::*;
 use glfw::{Action, Context, Key};
 use model::ModelBuilder;
@@ -110,109 +112,33 @@ fn main() {
         
     let start = Instant::now();
     let mut last_time = start;
+
+    let mut controller = Controller::new(&mut glfw, events);
+
     while !window.should_close() {
         window.swap_buffers();
-        glfw.poll_events();
+        controller.poll_input();
         let current_time = Instant::now();
         let time_delta = current_time.duration_since(last_time);
-        for (_, event) in glfw::flush_messages(&events) {
-            debug!(event = ?event, "glfw_polled_event");
-            let move_step_size = config::MOVE_SPEED * time_delta.as_secs_f32();
-            let angle_step = config::ROTATION_SPEED * time_delta.as_secs_f32();
-            match event {
-                glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
+        let move_step_size = config::MOVE_SPEED * time_delta.as_secs_f32();
+        for button in controller.buttons() {
+            match button {
+                Button::Quit => {
                     window.set_should_close(true)
                 },
-                glfw::WindowEvent::Key(Key::Up, _, Action::Repeat, _) => {
-                    model.transform = Translation3::new(0.0, 0.0, -move_step_size) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Up, _, Action::Press, _) => {
-                    model.transform = Translation3::new(0.0, 0.0, -move_step_size) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Down, _, Action::Repeat, _) => {
-                    model.transform = Translation3::new(0.0, 0.0, move_step_size) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Down, _, Action::Press, _) => {
-                    model.transform = Translation3::new(0.0, 0.0, move_step_size) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Right, _, Action::Repeat, _) => {
-                    model.transform = Translation3::new(move_step_size, 0.0, 0.0) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Right, _, Action::Press, _) => {
-                    model.transform = Translation3::new(move_step_size, 0.0, 0.0) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Left, _, Action::Repeat, _) => {
-                    model.transform = Translation3::new(-move_step_size, 0.0, 0.0) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::Left, _, Action::Press, _) => {
-                    model.transform = Translation3::new(-move_step_size, 0.0, 0.0) * model.transform;
-                },
-                glfw::WindowEvent::Key(Key::A, _, Action::Repeat, _) => {
-                    let axis = Vector3::z_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::A, _, Action::Press, _) => {
-                    let axis = Vector3::z_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::D, _, Action::Repeat, _) => {
-                    let axis = Vector3::z_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, -angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::D, _, Action::Press, _) => {
-                    let axis = Vector3::z_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, -angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::Q, _, Action::Repeat, _) => {
-                    let axis = Vector3::y_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::Q, _, Action::Press, _) => {
-                    let axis = Vector3::y_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::E, _, Action::Repeat, _) => {
-                    let axis = Vector3::y_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, -angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::E, _, Action::Press, _) => {
-                    let axis = Vector3::y_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, -angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::W, _, Action::Repeat, _) => {
-                    let axis = Vector3::x_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::W, _, Action::Press, _) => {
-                    let axis = Vector3::x_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::S, _, Action::Repeat, _) => {
-                    let axis = Vector3::x_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, -angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::Key(Key::S, _, Action::Press, _) => {
-                    let axis = Vector3::x_axis();
-                    model.rotation = model.rotation * Rotation3::from_axis_angle(&axis, -angle_step).to_homogeneous();
-                },
-                glfw::WindowEvent::CursorPos(x, y) => {
-                    let min_y = (config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE) as f64;
-                    let max_y = (config::MAX_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE) as f64;
-                    let y_min_clamped = if y < min_y {min_y} else {y};
-                    let y_clamped = if y_min_clamped > max_y {max_y} else {y_min_clamped};
-                    camera.latitude = x as f32 * config::CURSOR_MOVEMENT_SCALE;
-                    camera.longitude = -y_clamped as f32 * config::CURSOR_MOVEMENT_SCALE;
-                    window.set_cursor_pos(x, y_clamped)
-                },
-                glfw::WindowEvent::Scroll(_, y) => {
-                    let zoom = camera.distance - (y as f32 * config::SCROLL_ZOOM_SCALE);
-                    let clamp_min = if zoom > config::MIN_ZOOM {zoom} else {config::MIN_ZOOM};
-                    let clamp = if clamp_min < config::MAX_ZOOM {clamp_min} else {config::MAX_ZOOM};
-                    camera.distance = clamp as f32;
-                },
-                _ => (),
             }
         }
+        let (x, y) = controller.direction();
+        model.transform = Translation3::new(x * move_step_size, 0.0, y * move_step_size) * model.transform;
+        let (cx, cy, zoom) = controller.mouse();
+        let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
+        let max_cy = config::MAX_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
+        let cy_min_clamped = if cy < min_cy {min_cy} else {cy};
+        let cy_clamped = if cy_min_clamped > max_cy {max_cy} else {cy_min_clamped};
+        camera.latitude = cx as f32 * config::CURSOR_MOVEMENT_SCALE;
+        camera.longitude = -cy_clamped * config::CURSOR_MOVEMENT_SCALE;
+        window.set_cursor_pos(cx as f64, cy_clamped as f64);
+        camera.distance = camera.default_distance + zoom;
 
         clear();
         camera.target = model.transform.vector;

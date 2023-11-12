@@ -3,15 +3,17 @@ use na::{Vector3, Matrix4, Rotation3, Translation3, vector};
 
 pub struct Camera {
     pub distance: GLfloat,
+    pub default_distance: GLfloat,
     pub latitude: GLfloat,
     pub longitude: GLfloat,
     pub target: Vector3<GLfloat>,
 }
 
 impl Camera {
-    pub fn new(distance: GLfloat, latitude: GLfloat, longitude: GLfloat, target: Vector3<GLfloat>) -> Self {
+    pub fn new(default_distance: GLfloat, latitude: GLfloat, longitude: GLfloat, target: Vector3<GLfloat>) -> Self {
         Self {
-            distance,
+            distance: default_distance,
+            default_distance,
             latitude,
             longitude,
             target
