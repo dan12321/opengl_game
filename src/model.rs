@@ -75,18 +75,18 @@ impl<const R: usize, const S: usize> Model<R, S> {
         self.shader.set_uniform2f(name, value)
     }
 
-    pub fn add_uniform3f(mut self, name: &str, value: ((f32, f32, f32))) -> Result<Self, NulError> {
+    pub fn add_uniform3f(mut self, name: &str, value: (f32, f32, f32)) -> Result<Self, NulError> {
         self.shader = self.shader.add_uniform3f(name, value)?;
         Ok(self)
     }
 
-    pub fn get_uniform3f(&self, name: &str) -> Option<((f32, f32, f32))> {
+    pub fn get_uniform3f(&self, name: &str) -> Option<(f32, f32, f32)> {
         self.shader.get_uniform3f(name)
     }
 
     /// Sets the value of the uniform in the shader
     /// Returns the old value or none if the uniform doesn't exist
-    pub fn set_uniform3f(&mut self, name: &str, value: ((f32, f32, f32))) -> Option<((f32, f32, f32))> {
+    pub fn set_uniform3f(&mut self, name: &str, value: (f32, f32, f32)) -> Option<(f32, f32, f32)> {
         self.shader.set_uniform3f(name, value)
     }
 
