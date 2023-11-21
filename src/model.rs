@@ -129,6 +129,7 @@ pub struct ModelBuilder<const R: usize, const S: usize> {
     rotation: Option<Matrix4<GLfloat>>,
     textures: [Option<String>; 32],
     textures_count: usize,
+    normals: bool,
 }
 
 impl<const R: usize, const S: usize> ModelBuilder<R, S> {
@@ -141,6 +142,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             rotation: None,
             textures: Default::default(),
             textures_count: 0,
+            normals: false,
         }
     }
 
@@ -153,6 +155,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             rotation: self.rotation,
             textures: self.textures,
             textures_count: self.textures_count,
+            normals: self.normals,
         }
     }
 
@@ -165,6 +168,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             rotation: Some(rotation),
             textures: self.textures,
             textures_count: self.textures_count,
+            normals: self.normals,
         }
     }
 
@@ -181,8 +185,15 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             rotation: self.rotation,
             textures: self.textures,
             textures_count: self.textures_count,
+            normals: self.normals,
         }
     }
+
+    pub fn add_normals(mut self) -> Self {
+        self.normals = true;
+        self
+    }
+
 
 
     pub fn init(self) -> Model<R, S> {
@@ -198,19 +209,29 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             gl::BufferData(gl::ARRAY_BUFFER, (self.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, mem::transmute(&self.vertices), gl::STATIC_DRAW);
             gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&self.indices), gl::STATIC_DRAW);
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-    
-            let stride = if self.textures_count > 0 {
-                (3 + 2) * mem::size_of::<GLfloat>() as i32
-            } else {
-                3 * mem::size_of::<GLfloat>() as i32
-            };
+            
+            let mut stride = 3 * mem::size_of::<GLfloat>() as i32;
+            if self.normals {
+                stride += 3 * mem::size_of::<GLfloat>() as i32;
+            }
+            if self.textures_count > 0 {
+                stride +=  2 * mem::size_of::<GLfloat>() as i32;
+            }
             gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
             gl::EnableVertexAttribArray(0);
+            let mut tex_start = 3;
+            let mut tex_index = 1;
+            if self.normals {
+                gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, stride, (3 * mem::size_of::<GLfloat>()) as *mut c_void);
+                gl::EnableVertexAttribArray(1);
+                tex_start += 3;
+                tex_index += 1;
+            }
             for i in 0..self.textures_count {
-                let first_position = (3 + 2 * i) * mem::size_of::<GLfloat>();
+                let first_position = (tex_start + 2 * i) * mem::size_of::<GLfloat>();
                 debug!(first_position=first_position, "added texture");
-                gl::VertexAttribPointer((i+1) as u32, 2, gl::FLOAT, gl::FALSE, stride, first_position as *mut c_void);
-                gl::EnableVertexAttribArray((i+1) as u32);
+                gl::VertexAttribPointer((i+tex_index) as u32, 2, gl::FLOAT, gl::FALSE, stride, first_position as *mut c_void);
+                gl::EnableVertexAttribArray((i+tex_index) as u32);
             }
         }
 

@@ -66,6 +66,8 @@ fn main() {
     let light_position_uniform = "lightPosition";
     let light_color_uniform = "lightColor";
     let light_strenght_uniform = "lightStrength";
+    let ambient_color_uniform = "ambientColor";
+    let ambient_color_intensity_uniform = "ambientColorIntensity";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
     let znear: GLfloat = 0.1;
@@ -85,11 +87,11 @@ fn main() {
         .unwrap();
     let light_wso = light_model.world_space_operation();
     light_model = light_model.add_uniform_mat4(transformation_uniform, light_wso).unwrap();
-    let mut light = light::Light::new(light_model, 0.2, 1.0, 0.8, 20.0);
-
+    let mut light = light::Light::new(light_model, 0.2, 1.0, 0.8, 50.0);
     let texture_shader_program = Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let mut model = ModelBuilder::new(TEXTURED_CUBE_VERTICES.into(), TEXTURED_CUBE_INDICES.into(), texture_shader_program)
         .add_texture(String::from(config::WALL_TEXTURE))
+        .add_normals()
         .init()
         .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
         .unwrap()
@@ -100,6 +102,10 @@ fn main() {
         .add_uniform3f(light_position_uniform, (light.model.transform.x, light.model.transform.y,  light.model.transform.z))
         .unwrap()
         .add_uniform1f(light_strenght_uniform, light.strength)
+        .unwrap()
+        .add_uniform3f(ambient_color_uniform, (1.0, 1.0, 1.0))
+        .unwrap()
+        .add_uniform1f(ambient_color_intensity_uniform, 0.1)
         .unwrap();
     let world_space_operation = model.world_space_operation();
     model = model.add_uniform_mat4(transformation_uniform, world_space_operation).unwrap();
