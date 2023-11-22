@@ -14,6 +14,7 @@ pub struct Model<const R: usize, const S: usize> {
     pub indices: [GLuint; S],
     pub transform: Translation3<GLfloat>,
     pub rotation: Matrix4<GLfloat>,
+    pub scale: GLfloat,
     pub shader: Shader,
     vao: u32,
     vbo: u32,
@@ -23,7 +24,9 @@ pub struct Model<const R: usize, const S: usize> {
 
 impl<const R: usize, const S: usize> Model<R, S> {
     pub fn world_space_operation(&self) -> Matrix4<GLfloat> {
-        self.transform.to_homogeneous() * self.rotation
+        self.transform.to_homogeneous() *
+            self.rotation *
+            na::Scale3::new(self.scale, self.scale, self.scale).to_homogeneous()
     }
 
     pub fn draw(&self) {
@@ -127,6 +130,7 @@ pub struct ModelBuilder<const R: usize, const S: usize> {
     shader: Shader,
     transform: Option<Translation3<GLfloat>>,
     rotation: Option<Matrix4<GLfloat>>,
+    scale: GLfloat,
     textures: [Option<String>; 32],
     textures_count: usize,
     normals: bool,
@@ -140,36 +144,26 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             shader,
             transform: None,
             rotation: None,
+            scale: 1.0,
             textures: Default::default(),
             textures_count: 0,
             normals: false,
         }
     }
 
-    pub fn add_transform(self, transform: Translation3<GLfloat>) -> Self {
-        Self {
-            vertices: self.vertices,
-            indices: self.indices,
-            shader: self.shader,
-            transform: Some(transform),
-            rotation: self.rotation,
-            textures: self.textures,
-            textures_count: self.textures_count,
-            normals: self.normals,
-        }
+    pub fn add_transform(mut self, transform: Translation3<GLfloat>) -> Self {
+        self.transform = Some(transform);
+        self
     }
 
-    pub fn add_rotation(self, rotation: Matrix4<GLfloat>) -> Self {
-        Self {
-            vertices: self.vertices,
-            indices: self.indices,
-            shader: self.shader,
-            transform: self.transform,
-            rotation: Some(rotation),
-            textures: self.textures,
-            textures_count: self.textures_count,
-            normals: self.normals,
-        }
+    pub fn set_rotation(mut self, rotation: Matrix4<GLfloat>) -> Self {
+        self.rotation = Some(rotation);
+        self
+    }
+
+    pub fn set_scale(mut self, scale: GLfloat) -> Self {
+        self.scale = scale;
+        self
     }
 
     pub fn add_texture(mut self, texture: String) -> Self {
@@ -177,24 +171,13 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             self.textures[self.textures_count] = Some(texture);
             self.textures_count += 1;
         }
-        Self {
-            vertices: self.vertices,
-            indices: self.indices,
-            shader: self.shader,
-            transform: self.transform,
-            rotation: self.rotation,
-            textures: self.textures,
-            textures_count: self.textures_count,
-            normals: self.normals,
-        }
+        self
     }
 
     pub fn add_normals(mut self) -> Self {
         self.normals = true;
         self
     }
-
-
 
     pub fn init(self) -> Model<R, S> {
         let mut vao = 0;
@@ -268,6 +251,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
                 Some(r) => r,
                 None => Matrix4::identity(),                
             },
+            scale: self.scale,
             shader: self.shader,
             vao,
             vbo,
