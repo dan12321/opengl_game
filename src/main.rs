@@ -135,9 +135,9 @@ fn main() {
     .unwrap()
     .add_uniform1f(ambient_color_intensity_uniform, 0.1)
     .unwrap()
-    .add_uniform1i(shininess_uniform, 32)
+    .add_uniform1i(shininess_uniform, 128)
     .unwrap()
-    .add_uniform1f(specular_strength_uniform, 0.5)
+    .add_uniform1f(specular_strength_uniform, 0.7)
     .unwrap()
     .add_uniform3f(camera_position_uniform, camera.position())
     .unwrap();
