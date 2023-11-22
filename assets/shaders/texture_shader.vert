@@ -8,10 +8,12 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform vec3 lightPosition;
 uniform float lightStrength;
+uniform vec3 cameraPosition;
+uniform int shininess;
 
 out vec2 TexCoord;
-out vec3 Normal;
 out float LightIntensity;
+out float SpecularIntensity;
 
 void main()
 {
@@ -21,7 +23,11 @@ void main()
     vec3 lightDir = normalize(lightPosition - vec3(world_position));
     vec3 norm = normalize(mat3(transpose(inverse(transformation))) * normal);
     float diffuse = max(dot(norm, lightDir), 0.0);
-    LightIntensity = min(1.0, lightStrength / pow(dist, 2.0)) * diffuse;
+    vec3 cameraDir = normalize(cameraPosition - vec3(world_position));
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float distanceFallOff = min(1.0, lightStrength / pow(dist, 2.0));
+    SpecularIntensity = distanceFallOff * pow(max(dot(cameraDir, reflectDir), 0.0), shininess);
+    LightIntensity = distanceFallOff * diffuse;
     TexCoord = texCoord;
     gl_Position = values;
 }

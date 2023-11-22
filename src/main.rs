@@ -77,6 +77,9 @@ fn main() {
     let light_strenght_uniform = "lightStrength";
     let ambient_color_uniform = "ambientColor";
     let ambient_color_intensity_uniform = "ambientColorIntensity";
+    let camera_position_uniform = "cameraPosition";
+    let specular_strength_uniform = "specularStrength";
+    let shininess_uniform = "shininess";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
     let znear: GLfloat = 0.1;
@@ -131,6 +134,12 @@ fn main() {
     .add_uniform3f(ambient_color_uniform, (1.0, 1.0, 1.0))
     .unwrap()
     .add_uniform1f(ambient_color_intensity_uniform, 0.1)
+    .unwrap()
+    .add_uniform1i(shininess_uniform, 32)
+    .unwrap()
+    .add_uniform1f(specular_strength_uniform, 0.5)
+    .unwrap()
+    .add_uniform3f(camera_position_uniform, camera.position())
     .unwrap();
     let world_space_operation = model.world_space_operation();
     model = model
@@ -227,6 +236,9 @@ fn main() {
                 .unwrap();
             model
                 .set_uniform1f(light_strenght_uniform, light.strength)
+                .unwrap();
+            model
+                .set_uniform3f(camera_position_uniform, camera.position())
                 .unwrap();
             model.draw();
         }
