@@ -14,6 +14,8 @@ uniform int shininess;
 out vec2 TexCoord;
 out float LightIntensity;
 out float SpecularIntensity;
+out vec3 FragPos;
+out vec3 Normal;
 
 void main()
 {
@@ -22,6 +24,8 @@ void main()
     float dist = distance(world_position, vec4(lightPosition, 1.0));
     vec3 lightDir = normalize(lightPosition - vec3(world_position));
     vec3 norm = normalize(mat3(transpose(inverse(transformation))) * normal);
+    FragPos = vec3(world_position);
+    Normal = norm;
     float diffuse = max(dot(norm, lightDir), 0.0);
     vec3 cameraDir = normalize(cameraPosition - vec3(world_position));
     vec3 reflectDir = reflect(-lightDir, norm);
