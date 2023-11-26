@@ -88,9 +88,14 @@ fn main() {
     let mut camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
     let mut view = camera.transform();
     let light_shader = Shader::new(config::LIGHT_VERT_SHADER, config::LIGHT_FRAG_SHADER).unwrap();
+    let light_start_position = (0.0, 2.0, 0.0);
     let mut light_model =
         model::ModelBuilder::new(shape::CUBE_VERTICES, shape::CUBE_INDICES, light_shader)
-            .add_transform(Translation3::new(0.0, 2.0, 0.0))
+            .add_transform(Translation3::new(
+                light_start_position.0,
+                light_start_position.1,
+                light_start_position.2,
+            ))
             .set_scale(0.3)
             .init()
             .add_uniform3f(color_uniform, (0.0, 1.0, 0.0))
@@ -161,6 +166,7 @@ fn main() {
         window.swap_buffers();
         controller.poll_input();
         let current_time = Instant::now();
+        let time_since_start = current_time.duration_since(start).as_secs_f32();
         let time_delta = current_time.duration_since(last_time);
         let move_step_size = config::MOVE_SPEED * time_delta.as_secs_f32();
         for button in controller.buttons() {
@@ -184,6 +190,14 @@ fn main() {
         camera.longitude = -cy_clamped * config::CURSOR_MOVEMENT_SCALE;
         window.set_cursor_pos(cx as f64, cy_clamped as f64);
         camera.distance = camera.default_distance + zoom;
+
+        light.model.transform = Translation3::new(
+            light_start_position.0 + (time_since_start.sin() * 4.0),
+            light_start_position.1,
+            light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0)
+        );
+
+        light.color[0] = time_since_start.sin();
 
         clear();
         camera.target = model.transform.vector;
