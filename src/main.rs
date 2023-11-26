@@ -107,7 +107,7 @@ fn main() {
     let mut light = light::Light::new(light_model, 0.2, 1.0, 0.8, 50.0);
     let texture_shader_program =
         Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
-    let model_material = Material::new((0.5, 0.5, 0.5), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
+    let model_material = Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
     let mut model = ModelBuilder::new(
         TEXTURED_CUBE_VERTICES.into(),
         TEXTURED_CUBE_INDICES.into(),

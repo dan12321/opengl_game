@@ -3,7 +3,7 @@ struct Material {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
-    float shininess;
+    int shininess;
 };
 
 in vec2 TexCoord;
@@ -38,6 +38,5 @@ void main()
 
     vec4 ambient = vec4(material.ambient, 1.0);
 
-    // FragColor = (ambient + diffuse + specular) * tex;
-    FragColor = (ambient + diffuse + specular);
+    FragColor = (ambient + diffuse + specular) * tex;
 }
