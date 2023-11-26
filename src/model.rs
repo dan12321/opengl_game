@@ -1,8 +1,8 @@
 use super::shader::Shader;
 
 use std::{
-    mem,
-    ptr, ffi::{NulError, c_void},
+    ffi::{c_void, NulError},
+    mem, ptr,
 };
 
 use gl::types::*;
@@ -19,14 +19,15 @@ pub struct Model<const R: usize, const S: usize> {
     vao: u32,
     vbo: u32,
     ebo: u32,
+    material: Option<Material>,
     textures: [Option<u32>; 32],
 }
 
 impl<const R: usize, const S: usize> Model<R, S> {
     pub fn world_space_operation(&self) -> Matrix4<GLfloat> {
-        self.transform.to_homogeneous() *
-            self.rotation *
-            na::Scale3::new(self.scale, self.scale, self.scale).to_homogeneous()
+        self.transform.to_homogeneous()
+            * self.rotation
+            * na::Scale3::new(self.scale, self.scale, self.scale).to_homogeneous()
     }
 
     pub fn draw(&self) {
@@ -37,15 +38,44 @@ impl<const R: usize, const S: usize> Model<R, S> {
                     Some(t) => {
                         gl::ActiveTexture(GL_TEXTURES[i]);
                         gl::BindTexture(gl::TEXTURE_2D, t);
-                    },
+                    }
                     None => break,
                 }
             }
             gl::BindVertexArray(self.vao);
-            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&self.indices), gl::STATIC_DRAW);
-            gl::DrawElements(gl::TRIANGLES, self.indices.len() as i32, gl::UNSIGNED_INT, ptr::null());
+            gl::BufferData(
+                gl::ELEMENT_ARRAY_BUFFER,
+                (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                mem::transmute(&self.indices),
+                gl::STATIC_DRAW,
+            );
+            gl::DrawElements(
+                gl::TRIANGLES,
+                self.indices.len() as i32,
+                gl::UNSIGNED_INT,
+                ptr::null(),
+            );
             gl::BindVertexArray(0);
         }
+    }
+
+    pub fn set_material(mut self, material: Material) -> Result<Self, NulError> {
+        let first_material = self.material.is_none();
+        if first_material {
+            self.shader = self.shader
+                .add_uniform3f(AMBIENT_UNIFORM, material.ambient)?
+                .add_uniform3f(DIFFUSE_UNIFORM, material.diffuse)?
+                .add_uniform3f(SPECULAR_UNIFORM, material.specular)?
+                .add_uniform1i(SHININESS_UNIFORM, material.shininess)?;
+        } else {
+            // TODO: Error if failed
+            self.shader.set_uniform3f(AMBIENT_UNIFORM, material.ambient);
+            self.shader.set_uniform3f(DIFFUSE_UNIFORM, material.diffuse);
+            self.shader.set_uniform3f(SPECULAR_UNIFORM, material.specular);
+            self.shader.set_uniform1i(SHININESS_UNIFORM, material.shininess);
+        }
+        self.material = Some(material);
+        Ok(self)
     }
 
     pub fn add_uniform1f(mut self, name: &str, value: f32) -> Result<Self, NulError> {
@@ -189,32 +219,56 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             gl::GenBuffers(1, &mut ebo);
             gl::BindVertexArray(vao);
             gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-            gl::BufferData(gl::ARRAY_BUFFER, (self.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr, mem::transmute(&self.vertices), gl::STATIC_DRAW);
-            gl::BufferData(gl::ELEMENT_ARRAY_BUFFER, (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr, mem::transmute(&self.indices), gl::STATIC_DRAW);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                (self.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                mem::transmute(&self.vertices),
+                gl::STATIC_DRAW,
+            );
+            gl::BufferData(
+                gl::ELEMENT_ARRAY_BUFFER,
+                (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                mem::transmute(&self.indices),
+                gl::STATIC_DRAW,
+            );
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-            
+
             let mut stride = 3 * mem::size_of::<GLfloat>() as i32;
             if self.normals {
                 stride += 3 * mem::size_of::<GLfloat>() as i32;
             }
             if self.textures_count > 0 {
-                stride +=  2 * mem::size_of::<GLfloat>() as i32;
+                stride += 2 * mem::size_of::<GLfloat>() as i32;
             }
             gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
             gl::EnableVertexAttribArray(0);
             let mut tex_start = 3;
             let mut tex_index = 1;
             if self.normals {
-                gl::VertexAttribPointer(1, 3, gl::FLOAT, gl::FALSE, stride, (3 * mem::size_of::<GLfloat>()) as *mut c_void);
+                gl::VertexAttribPointer(
+                    1,
+                    3,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    stride,
+                    (3 * mem::size_of::<GLfloat>()) as *mut c_void,
+                );
                 gl::EnableVertexAttribArray(1);
                 tex_start += 3;
                 tex_index += 1;
             }
             for i in 0..self.textures_count {
                 let first_position = (tex_start + 2 * i) * mem::size_of::<GLfloat>();
-                debug!(first_position=first_position, "added texture");
-                gl::VertexAttribPointer((i+tex_index) as u32, 2, gl::FLOAT, gl::FALSE, stride, first_position as *mut c_void);
-                gl::EnableVertexAttribArray((i+tex_index) as u32);
+                debug!(first_position = first_position, "added texture");
+                gl::VertexAttribPointer(
+                    (i + tex_index) as u32,
+                    2,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    stride,
+                    first_position as *mut c_void,
+                );
+                gl::EnableVertexAttribArray((i + tex_index) as u32);
             }
         }
 
@@ -226,16 +280,26 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
                     let texture_image = image::open(t).unwrap();
                     // Uses native endian. Not sure if this always matches what opengl expects
                     let texture_bytes = texture_image.as_bytes();
-                
+
                     unsafe {
                         gl::GenTextures(1, &mut texture);
                         gl::BindTexture(gl::TEXTURE_2D, texture);
-                        gl::TexImage2D(gl::TEXTURE_2D, 0, gl::RGB as i32, texture_image.width() as i32, texture_image.height() as i32, 0, gl::RGB, gl::UNSIGNED_BYTE, &texture_bytes[0] as *const _ as *const c_void);
+                        gl::TexImage2D(
+                            gl::TEXTURE_2D,
+                            0,
+                            gl::RGB as i32,
+                            texture_image.width() as i32,
+                            texture_image.height() as i32,
+                            0,
+                            gl::RGB,
+                            gl::UNSIGNED_BYTE,
+                            &texture_bytes[0] as *const _ as *const c_void,
+                        );
                         gl::GenerateMipmap(gl::TEXTURE_2D);
                     }
 
                     textures[i] = Some(texture);
-                },
+                }
                 None => break,
             }
         }
@@ -249,7 +313,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             },
             rotation: match self.rotation {
                 Some(r) => r,
-                None => Matrix4::identity(),                
+                None => Matrix4::identity(),
             },
             scale: self.scale,
             shader: self.shader,
@@ -257,6 +321,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             vbo,
             ebo,
             textures,
+            material: None,
         }
     }
 }
@@ -295,3 +360,32 @@ const GL_TEXTURES: [GLenum; 32] = [
     gl::TEXTURE30,
     gl::TEXTURE31,
 ];
+
+pub struct Material {
+    ambient: (f32, f32, f32),
+    diffuse: (f32, f32, f32),
+    specular: (f32, f32, f32),
+    shininess: GLint,
+}
+
+impl Material {
+    pub fn new(
+        ambient: (f32, f32, f32),
+        diffuse: (f32, f32, f32),
+        specular: (f32, f32, f32),
+        shininess: i32,
+    ) -> Self {
+        Material {
+            ambient,
+            diffuse,
+            specular,
+            shininess,
+        }
+    }
+}
+
+static AMBIENT_UNIFORM: &'static str = "material.ambient";
+static DIFFUSE_UNIFORM: &'static str = "material.diffuse";
+static SPECULAR_UNIFORM: &'static str = "material.specular";
+static SHININESS_UNIFORM: &'static str = "material.shininess";
+

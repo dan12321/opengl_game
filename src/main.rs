@@ -18,13 +18,13 @@ use std::time::Instant;
 use camera::Camera;
 use controller::{Button, Controller};
 use gl::types::*;
-use glfw::{Action, Context, Key};
-use model::ModelBuilder;
+use glfw::Context;
+use model::{ModelBuilder, Material};
 use na::{vector, Perspective3, Rotation3, Translation3, Unit, Vector3};
 use rand::Rng;
 use shader::Shader;
 use shape::{TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES};
-use tracing::{debug, Level};
+use tracing::Level;
 
 fn main() {
     // Log setup
@@ -75,11 +75,7 @@ fn main() {
     let light_position_uniform = "lightPosition";
     let light_color_uniform = "lightColor";
     let light_strenght_uniform = "lightStrength";
-    let ambient_color_uniform = "ambientColor";
-    let ambient_color_intensity_uniform = "ambientColorIntensity";
     let camera_position_uniform = "cameraPosition";
-    let specular_strength_uniform = "specularStrength";
-    let shininess_uniform = "shininess";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
     let znear: GLfloat = 0.1;
@@ -111,6 +107,7 @@ fn main() {
     let mut light = light::Light::new(light_model, 0.2, 1.0, 0.8, 50.0);
     let texture_shader_program =
         Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
+    let model_material = Material::new((0.5, 0.5, 0.5), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
     let mut model = ModelBuilder::new(
         TEXTURED_CUBE_VERTICES.into(),
         TEXTURED_CUBE_INDICES.into(),
@@ -136,13 +133,7 @@ fn main() {
     .unwrap()
     .add_uniform1f(light_strenght_uniform, light.strength)
     .unwrap()
-    .add_uniform3f(ambient_color_uniform, (1.0, 1.0, 1.0))
-    .unwrap()
-    .add_uniform1f(ambient_color_intensity_uniform, 0.1)
-    .unwrap()
-    .add_uniform1i(shininess_uniform, 128)
-    .unwrap()
-    .add_uniform1f(specular_strength_uniform, 0.7)
+    .set_material(model_material)
     .unwrap()
     .add_uniform3f(camera_position_uniform, camera.position())
     .unwrap();
@@ -194,7 +185,7 @@ fn main() {
         light.model.transform = Translation3::new(
             light_start_position.0 + (time_since_start.sin() * 4.0),
             light_start_position.1,
-            light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0)
+            light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0),
         );
 
         light.color[0] = time_since_start.sin();

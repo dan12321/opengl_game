@@ -1,35 +1,43 @@
 #version 330 core
+struct Material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float shininess;
+};
 
 in vec2 TexCoord;
-in float LightIntensity;
-in float SpecularIntensity;
 in vec3 FragPos;
 in vec3 Normal;
+
 uniform sampler2D texture0;
 uniform vec3 lightColor;
-uniform vec3 ambientColor;
-uniform float specularStrength;
-uniform float ambientColorIntensity;
 uniform vec3 lightPosition;
 uniform float lightStrength;
 uniform vec3 cameraPosition;
-uniform int shininess;
+uniform Material material;
 
 out vec4 FragColor;
 
 void main()
 {
     vec4 tex = texture2D(texture0, TexCoord);
-    float dist = distance(FragPos, lightPosition);
+
     vec3 lightDir = normalize(lightPosition - FragPos);
-    float diffuse = max(dot(Normal, lightDir), 0.0);
+    float lightDist = distance(FragPos, lightPosition);
+    float distanceFallOff = min(1.0, lightStrength / pow(lightDist, 2.0));
+
+    float diffuseIntensity = max(dot(Normal, lightDir), 0.0);
+    vec3 diffuseColor = distanceFallOff * diffuseIntensity * material.diffuse;
+    vec4 diffuse = vec4(diffuseColor * lightColor, 1.0);
+
     vec3 cameraDir = normalize(cameraPosition - FragPos);
     vec3 reflectDir = reflect(-lightDir, Normal);
-    float distanceFallOff = min(1.0, lightStrength / pow(dist, 2.0));
-    float specularIntensity = distanceFallOff * pow(max(dot(cameraDir, reflectDir), 0.0), shininess);
-    float lightIntensity = distanceFallOff * diffuse;
-    vec4 ambient = vec4(ambientColorIntensity * ambientColor, 1.0);
-    vec4 light = vec4(lightIntensity * lightColor, 1.0);
-    vec4 specular = vec4(specularStrength * specularIntensity * lightColor, 1.0);
-    FragColor = (ambient + light + specular) * tex;
+    float specularIntensity = distanceFallOff * pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
+    vec4 specular = vec4(specularIntensity * lightColor * material.specular, 1.0);
+
+    vec4 ambient = vec4(material.ambient, 1.0);
+
+    // FragColor = (ambient + diffuse + specular) * tex;
+    FragColor = (ambient + diffuse + specular);
 }
