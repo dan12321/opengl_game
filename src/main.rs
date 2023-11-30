@@ -72,9 +72,6 @@ fn main() {
     let projection_uniform = "projection";
     let view_uniform = "view";
     let color_uniform = "color";
-    let light_position_uniform = "lightPosition";
-    let light_color_uniform = "lightColor";
-    let light_strenght_uniform = "lightStrength";
     let camera_position_uniform = "cameraPosition";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
@@ -104,7 +101,7 @@ fn main() {
     light_model = light_model
         .add_uniform_mat4(transformation_uniform, light_wso)
         .unwrap();
-    let mut light = light::Light::new(light_model, 0.2, 1.0, 0.8, 50.0);
+    let mut light = light::Light::new(light_model, (0.2, 1.0, 0.8), (0.2, 1.0, 0.8), 50.0);
     let texture_shader_program =
         Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let model_material = Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
@@ -120,18 +117,7 @@ fn main() {
     .unwrap()
     .add_uniform_mat4(view_uniform, view)
     .unwrap()
-    .add_uniform3f(light_color_uniform, light.color.into())
-    .unwrap()
-    .add_uniform3f(
-        light_position_uniform,
-        (
-            light.model.transform.x,
-            light.model.transform.y,
-            light.model.transform.z,
-        ),
-    )
-    .unwrap()
-    .add_uniform1f(light_strenght_uniform, light.strength)
+    .set_light(light.as_light_uniforms())
     .unwrap()
     .set_material(model_material)
     .unwrap()
@@ -188,7 +174,8 @@ fn main() {
             light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0),
         );
 
-        light.color[0] = time_since_start.sin();
+        light.diffuse.0 = time_since_start.sin();
+        light.specular.0 = time_since_start.sin();
 
         clear();
         camera.target = model.transform.vector;
@@ -226,22 +213,7 @@ fn main() {
                 .set_uniform_mat4(projection_uniform, projection.as_matrix().clone())
                 .unwrap();
             model.set_uniform_mat4(view_uniform, view).unwrap();
-            model
-                .set_uniform3f(light_color_uniform, light.color.into())
-                .unwrap();
-            model
-                .set_uniform3f(
-                    light_position_uniform,
-                    (
-                        light.model.transform.x,
-                        light.model.transform.y,
-                        light.model.transform.z,
-                    ),
-                )
-                .unwrap();
-            model
-                .set_uniform1f(light_strenght_uniform, light.strength)
-                .unwrap();
+            model = model.set_light(light.as_light_uniforms()).unwrap();
             model
                 .set_uniform3f(camera_position_uniform, camera.position())
                 .unwrap();
@@ -254,7 +226,7 @@ fn main() {
             .unwrap();
         light
             .model
-            .set_uniform3f(color_uniform, light.color.into())
+            .set_uniform3f(color_uniform, light.specular.into())
             .unwrap();
         light.model.draw();
         last_time = current_time;

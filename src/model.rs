@@ -1,3 +1,5 @@
+use crate::light::{self, LightUniform};
+
 use super::shader::Shader;
 
 use std::{
@@ -20,6 +22,7 @@ pub struct Model<const R: usize, const S: usize> {
     vbo: u32,
     ebo: u32,
     material: Option<Material>,
+    light_uniform: Option<LightUniform>,
     textures: [Option<u32>; 32],
 }
 
@@ -75,6 +78,25 @@ impl<const R: usize, const S: usize> Model<R, S> {
             self.shader.set_uniform1i(SHININESS_UNIFORM, material.shininess);
         }
         self.material = Some(material);
+        Ok(self)
+    }
+
+    pub fn set_light(mut self, light_uniform: LightUniform) -> Result<Self, NulError> {
+        let first_light = self.light_uniform.is_none();
+        if first_light {
+            self.shader = self.shader
+                .add_uniform3f(light::POSITION_UNIFORM, light_uniform.position)?
+                .add_uniform3f(light::DIFFUSE_UNIFORM, light_uniform.diffuse)?
+                .add_uniform3f(light::SPECULAR_UNIFORM, light_uniform.specular)?
+                .add_uniform1f(light::STRENGTH_UNIFORM, light_uniform.strength)?;
+        } else {
+            // TODO: Error if failed
+            self.shader.set_uniform3f(light::POSITION_UNIFORM, light_uniform.position);
+            self.shader.set_uniform3f(light::DIFFUSE_UNIFORM, light_uniform.diffuse);
+            self.shader.set_uniform3f(light::SPECULAR_UNIFORM, light_uniform.specular);
+            self.shader.set_uniform1f(light::STRENGTH_UNIFORM, light_uniform.strength);
+        }
+        self.light_uniform = Some(light_uniform);
         Ok(self)
     }
 
@@ -322,6 +344,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             ebo,
             textures,
             material: None,
+            light_uniform: None,
         }
     }
 }
