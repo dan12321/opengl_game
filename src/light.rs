@@ -41,7 +41,21 @@ impl<const R: usize, const S: usize> Light<R, S> {
     }
 }
 
-pub const POSITION_UNIFORM: &'static str = "light.position";
-pub const DIFFUSE_UNIFORM: &'static str = "light.diffuse";
-pub const SPECULAR_UNIFORM: &'static str = "light.specular";
-pub const STRENGTH_UNIFORM: &'static str = "light.strength";
+pub fn template_light(index: usize, prop: Prop) -> String {
+    let property = match prop {
+        Prop::Position => "position",
+        Prop::Diffuse => "diffuse",
+        Prop::Specular => "specular",
+        Prop::Strength => "strength",
+    };
+
+    format!("pointLights[{}].{}", index, property)
+}
+
+pub enum Prop {
+    Position,
+    Diffuse,
+    Specular,
+    Strength,
+}
+

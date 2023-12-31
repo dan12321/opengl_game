@@ -80,6 +80,7 @@ fn main() {
     let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
     let mut camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
     let mut view = camera.transform();
+
     let light_shader = Shader::new(config::LIGHT_VERT_SHADER, config::LIGHT_FRAG_SHADER).unwrap();
     let light_start_position = (0.0, 2.0, 0.0);
     let mut light_model =
@@ -102,6 +103,30 @@ fn main() {
         .add_uniform_mat4(transformation_uniform, light_wso)
         .unwrap();
     let mut light = light::Light::new(light_model, (0.2, 1.0, 0.8), (0.2, 1.0, 0.8), 50.0);
+
+    let light2_shader = Shader::new(config::LIGHT_VERT_SHADER, config::LIGHT_FRAG_SHADER).unwrap();
+    let light2_start_position = (0.0, 0.0, -10.0);
+    let mut light2_model =
+        model::ModelBuilder::new(shape::CUBE_VERTICES, shape::CUBE_INDICES, light2_shader)
+            .add_transform(Translation3::new(
+                light2_start_position.0,
+                light2_start_position.1,
+                light2_start_position.2,
+            ))
+            .set_scale(0.3)
+            .init()
+            .add_uniform3f(color_uniform, (1.0, 0.4, 0.4))
+            .unwrap()
+            .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
+            .unwrap()
+            .add_uniform_mat4(view_uniform, view)
+            .unwrap();
+    let light2_wso = light2_model.world_space_operation();
+    light2_model = light2_model
+        .add_uniform_mat4(transformation_uniform, light2_wso)
+        .unwrap();
+    let mut light2 = light::Light::new(light2_model, (1.0, 0.4, 0.4), (1.0, 0.6, 0.6), 80.0);
+
     let texture_shader_program =
         Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let model_material = Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
@@ -117,7 +142,9 @@ fn main() {
     .unwrap()
     .add_uniform_mat4(view_uniform, view)
     .unwrap()
-    .set_light(light.as_light_uniforms())
+    .add_light(light.as_light_uniforms())
+    .unwrap()
+    .add_light(light2.as_light_uniforms())
     .unwrap()
     .set_material(model_material)
     .unwrap()
@@ -213,7 +240,7 @@ fn main() {
                 .set_uniform_mat4(projection_uniform, projection.as_matrix().clone())
                 .unwrap();
             model.set_uniform_mat4(view_uniform, view).unwrap();
-            model = model.set_light(light.as_light_uniforms()).unwrap();
+            model.set_light(0, light.as_light_uniforms());
             model
                 .set_uniform3f(camera_position_uniform, camera.position())
                 .unwrap();
@@ -229,6 +256,16 @@ fn main() {
             .set_uniform3f(color_uniform, light.specular.into())
             .unwrap();
         light.model.draw();
+        light2.model.set_uniform_mat4(view_uniform, view).unwrap();
+        light2
+            .model
+            .set_uniform_mat4(transformation_uniform, light2.model.world_space_operation())
+            .unwrap();
+        light2
+            .model
+            .set_uniform3f(color_uniform, light2.specular.into())
+            .unwrap();
+        light2.model.draw();
         last_time = current_time;
     }
 }

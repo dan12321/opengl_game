@@ -1,4 +1,4 @@
-use crate::light::{self, LightUniform};
+use crate::light::{self, LightUniform, template_light};
 
 use super::shader::Shader;
 
@@ -22,7 +22,7 @@ pub struct Model<const R: usize, const S: usize> {
     vbo: u32,
     ebo: u32,
     material: Option<Material>,
-    light_uniform: Option<LightUniform>,
+    light_uniform: Vec<LightUniform>,
     textures: [Option<u32>; 32],
 }
 
@@ -81,22 +81,22 @@ impl<const R: usize, const S: usize> Model<R, S> {
         Ok(self)
     }
 
-    pub fn set_light(mut self, light_uniform: LightUniform) -> Result<Self, NulError> {
-        let first_light = self.light_uniform.is_none();
-        if first_light {
-            self.shader = self.shader
-                .add_uniform3f(light::POSITION_UNIFORM, light_uniform.position)?
-                .add_uniform3f(light::DIFFUSE_UNIFORM, light_uniform.diffuse)?
-                .add_uniform3f(light::SPECULAR_UNIFORM, light_uniform.specular)?
-                .add_uniform1f(light::STRENGTH_UNIFORM, light_uniform.strength)?;
-        } else {
-            // TODO: Error if failed
-            self.shader.set_uniform3f(light::POSITION_UNIFORM, light_uniform.position);
-            self.shader.set_uniform3f(light::DIFFUSE_UNIFORM, light_uniform.diffuse);
-            self.shader.set_uniform3f(light::SPECULAR_UNIFORM, light_uniform.specular);
-            self.shader.set_uniform1f(light::STRENGTH_UNIFORM, light_uniform.strength);
-        }
-        self.light_uniform = Some(light_uniform);
+    pub fn set_light(&mut self, index: usize, light_uniform: LightUniform) {
+        self.light_uniform[index] = light_uniform;
+        self.shader.set_uniform3f(&template_light(index, light::Prop::Position), self.light_uniform[index].position);
+        self.shader.set_uniform3f(&template_light(index, light::Prop::Diffuse), self.light_uniform[index].diffuse);
+        self.shader.set_uniform3f(&template_light(index, light::Prop::Specular), self.light_uniform[index].specular);
+        self.shader.set_uniform1f(&template_light(index, light::Prop::Strength), self.light_uniform[index].strength);
+    }
+
+    pub fn add_light(mut self, light_uniform: LightUniform) -> Result<Self, NulError> {
+        let index = self.light_uniform.len();
+        self.light_uniform.push(light_uniform);
+        self.shader = self.shader
+            .add_uniform3f(&template_light(index, light::Prop::Position), self.light_uniform[index].position)?
+            .add_uniform3f(&template_light(index, light::Prop::Diffuse), self.light_uniform[index].diffuse)?
+            .add_uniform3f(&template_light(index, light::Prop::Specular), self.light_uniform[index].specular)?
+            .add_uniform1f(&template_light(index, light::Prop::Strength), self.light_uniform[index].strength)?;
         Ok(self)
     }
 
@@ -114,7 +114,6 @@ impl<const R: usize, const S: usize> Model<R, S> {
     pub fn set_uniform1f(&mut self, name: &str, value: f32) -> Option<f32> {
         self.shader.set_uniform1f(name, value)
     }
-
     pub fn add_uniform2f(mut self, name: &str, value: (f32, f32)) -> Result<Self, NulError> {
         self.shader = self.shader.add_uniform2f(name, value)?;
         Ok(self)
@@ -344,7 +343,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             ebo,
             textures,
             material: None,
-            light_uniform: None,
+            light_uniform: Vec::new(),
         }
     }
 }
