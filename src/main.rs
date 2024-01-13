@@ -128,7 +128,7 @@ fn main() {
     let mut light2 = light::Light::new(light2_model, (1.0, 0.4, 0.4), (1.0, 0.6, 0.6), 80.0);
 
     let texture_shader_program =
-        Shader::new(config::TEXTURE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
+        Shader::new(config::CUBE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let model_material = Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
     let mut model = ModelBuilder::new(
         TEXTURED_CUBE_VERTICES.into(),
@@ -153,6 +153,33 @@ fn main() {
     let world_space_operation = model.world_space_operation();
     model = model
         .add_uniform_mat4(transformation_uniform, world_space_operation)
+        .unwrap();
+
+    let plane_shader_program = Shader::new(config::PLANE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
+    let plane_material = Material::new((0.2, 0.2, 0.1), (0.5, 0.5, 0.2), (0.5, 0.5, 0.4), 64);
+    let mut plane = ModelBuilder::new(
+        shape::QUAD_VERTICES.into(),
+        shape::QUAD_INDICES.into(),
+        plane_shader_program,
+    )
+    .add_texture(String::from(config::WALL_TEXTURE))
+    .set_scale(100.0)
+    .init()
+    .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
+    .unwrap()
+    .add_uniform_mat4(view_uniform, view)
+    .unwrap()
+    .add_light(light.as_light_uniforms())
+    .unwrap()
+    .add_light(light2.as_light_uniforms())
+    .unwrap()
+    .set_material(plane_material)
+    .unwrap()
+    .add_uniform3f(camera_position_uniform, camera.position())
+    .unwrap();
+    let plane_space = plane.world_space_operation();
+    plane = plane
+        .add_uniform_mat4(transformation_uniform, plane_space)
         .unwrap();
 
     let mut rng = rand::thread_rng();
@@ -246,6 +273,10 @@ fn main() {
                 .unwrap();
             model.draw();
         }
+        plane.set_uniform_mat4(view_uniform, view).unwrap();
+        plane.set_light(0, light.as_light_uniforms());
+        plane.set_uniform3f(camera_position_uniform, camera.position()).unwrap();
+        plane.draw();
         light.model.set_uniform_mat4(view_uniform, view).unwrap();
         light
             .model

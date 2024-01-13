@@ -1,8 +1,9 @@
 // Assets
-pub const TEXTURE_VERT_SHADER: &'static str = "assets/shaders/texture_shader.vert";
-pub const TEXTURE_FRAG_SHADER: &'static str = "assets/shaders/texture_shader.frag";
-pub const LIGHT_VERT_SHADER: &'static str = "assets/shaders/light_shader.vert";
-pub const LIGHT_FRAG_SHADER: &'static str = "assets/shaders/light_shader.frag";
+pub const CUBE_VERT_SHADER: &'static str = "assets/shaders/cube.vert";
+pub const PLANE_VERT_SHADER: &'static str = "assets/shaders/plane.vert";
+pub const TEXTURE_FRAG_SHADER: &'static str = "assets/shaders/texture.frag";
+pub const LIGHT_VERT_SHADER: &'static str = "assets/shaders/light.vert";
+pub const LIGHT_FRAG_SHADER: &'static str = "assets/shaders/light.frag";
 pub const WALL_TEXTURE: &'static str = "assets/textures/scifiwall.jpg";
 
 // Movement

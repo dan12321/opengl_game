@@ -6,9 +6,6 @@ layout(location = 2) in vec2 texCoord;
 uniform mat4 transformation;
 uniform mat4 view;
 uniform mat4 projection;
-uniform vec3 lightPosition;
-uniform float lightStrength;
-uniform vec3 cameraPosition;
 
 out vec2 TexCoord;
 out vec3 FragPos;

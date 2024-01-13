@@ -18,7 +18,6 @@ in vec3 FragPos;
 in vec3 Normal;
 
 uniform sampler2D texture0;
-uniform vec3 lightColor;
 uniform vec3 cameraPosition;
 uniform Material material;
 
