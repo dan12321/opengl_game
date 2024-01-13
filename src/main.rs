@@ -164,6 +164,8 @@ fn main() {
     )
     .add_texture(String::from(config::WALL_TEXTURE))
     .set_scale(100.0)
+    .set_rotation(Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous())
+    .add_transform(Translation3::new(0.0, -0.5, 0.0))
     .init()
     .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
     .unwrap()
