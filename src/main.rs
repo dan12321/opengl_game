@@ -233,8 +233,10 @@ fn main() {
         light.model.transform = Translation3::new(
             light_start_position.0 + (time_since_start.sin() * 4.0),
             light_start_position.1,
-            light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0),
+            light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0) - y_pos,
         );
+
+        light2.model.transform.z -= y * move_step_size;
 
         light.diffuse.0 = time_since_start.sin();
         light.specular.0 = time_since_start.sin();
@@ -256,7 +258,7 @@ fn main() {
             let transformation_offset = Translation3::new(
                 (random_offsets[i] % 19.0) - 9.5,
                 (random_offsets[i] % 21.0) - 10.5,
-                -random_offsets[i] % 31.0,
+                -random_offsets[i] % 31.0 - y_pos,
             )
             .to_homogeneous();
             if i == 0 {
@@ -276,6 +278,7 @@ fn main() {
                 .unwrap();
             model.set_uniform_mat4(view_uniform, view).unwrap();
             model.set_light(0, light.as_light_uniforms());
+            model.set_light(1, light2.as_light_uniforms());
             model
                 .set_uniform3f(camera_position_uniform, camera.position())
                 .unwrap();
@@ -283,6 +286,7 @@ fn main() {
         }
         plane.set_uniform_mat4(view_uniform, view).unwrap();
         plane.set_light(0, light.as_light_uniforms());
+        plane.set_light(1, light2.as_light_uniforms());
         plane.set_uniform3f(camera_position_uniform, camera.position()).unwrap();
         plane.set_uniform1f(offset_uniform, y_pos / plane.scale);
         plane.draw();
