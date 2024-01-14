@@ -6,6 +6,7 @@ layout(location = 1) in vec2 texCoord;
 uniform mat4 transformation;
 uniform mat4 view;
 uniform mat4 projection;
+uniform float offset;
 
 out vec2 TexCoord;
 out vec3 FragPos;

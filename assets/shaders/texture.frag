@@ -20,6 +20,7 @@ in vec3 Normal;
 uniform sampler2D texture0;
 uniform vec3 cameraPosition;
 uniform Material material;
+uniform float offset;
 
 #define NR_POINT_LIGHTS 64
 uniform PointLight pointLights[NR_POINT_LIGHTS];
@@ -29,7 +30,8 @@ out vec4 FragColor;
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir);
 void main()
 {
-    vec4 tex = texture2D(texture0, TexCoord);
+    vec2 texCoord = vec2(TexCoord.x, mod(TexCoord.y + offset, 1.0));
+    vec4 tex = texture2D(texture0, texCoord);
     vec3 cameraDir = normalize(cameraPosition - FragPos);
 
     vec3 color = material.ambient;

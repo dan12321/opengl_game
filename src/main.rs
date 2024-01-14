@@ -73,6 +73,7 @@ fn main() {
     let view_uniform = "view";
     let color_uniform = "color";
     let camera_position_uniform = "cameraPosition";
+    let offset_uniform = "offset";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
     let znear: GLfloat = 0.1;
@@ -115,7 +116,7 @@ fn main() {
             ))
             .set_scale(0.3)
             .init()
-            .add_uniform3f(color_uniform, (1.0, 0.4, 0.4))
+            .add_uniform3f(color_uniform, (1.0, 0.0, 1.0))
             .unwrap()
             .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
             .unwrap()
@@ -125,7 +126,7 @@ fn main() {
     light2_model = light2_model
         .add_uniform_mat4(transformation_uniform, light2_wso)
         .unwrap();
-    let mut light2 = light::Light::new(light2_model, (1.0, 0.4, 0.4), (1.0, 0.6, 0.6), 80.0);
+    let mut light2 = light::Light::new(light2_model, (1.0, 0.0, 1.0), (1.0, 0.0, 1.0), 80.0);
 
     let texture_shader_program =
         Shader::new(config::CUBE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
@@ -149,6 +150,8 @@ fn main() {
     .set_material(model_material)
     .unwrap()
     .add_uniform3f(camera_position_uniform, camera.position())
+    .unwrap()
+    .add_uniform1f(offset_uniform, 0.0)
     .unwrap();
     let world_space_operation = model.world_space_operation();
     model = model
@@ -178,6 +181,8 @@ fn main() {
     .set_material(plane_material)
     .unwrap()
     .add_uniform3f(camera_position_uniform, camera.position())
+    .unwrap()
+    .add_uniform1f(offset_uniform, 0.0)
     .unwrap();
     let plane_space = plane.world_space_operation();
     plane = plane
@@ -194,7 +199,7 @@ fn main() {
     let mut last_time = start;
 
     let mut controller = Controller::new(&mut glfw, events);
-
+    let mut y_pos = 0.0;
     while !window.should_close() {
         window.swap_buffers();
         controller.poll_input();
@@ -208,8 +213,9 @@ fn main() {
             }
         }
         let (x, y) = controller.direction();
+        y_pos += y * move_step_size;
         model.transform =
-            Translation3::new(x * move_step_size, 0.0, y * move_step_size) * model.transform;
+            Translation3::new(x * move_step_size, 0.0, 0.0) * model.transform;
         let (cx, cy, zoom) = controller.mouse();
         let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
         let max_cy = config::MAX_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
@@ -278,6 +284,7 @@ fn main() {
         plane.set_uniform_mat4(view_uniform, view).unwrap();
         plane.set_light(0, light.as_light_uniforms());
         plane.set_uniform3f(camera_position_uniform, camera.position()).unwrap();
+        plane.set_uniform1f(offset_uniform, y_pos / plane.scale);
         plane.draw();
         light.model.set_uniform_mat4(view_uniform, view).unwrap();
         light
