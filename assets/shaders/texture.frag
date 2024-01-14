@@ -30,7 +30,7 @@ out vec4 FragColor;
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir);
 void main()
 {
-    vec2 texCoord = vec2(TexCoord.x, mod(TexCoord.y + offset, 1.0));
+    vec2 texCoord = vec2(TexCoord.x, TexCoord.y + offset);
     vec4 tex = texture2D(texture0, texCoord);
     vec3 cameraDir = normalize(cameraPosition - FragPos);
 
