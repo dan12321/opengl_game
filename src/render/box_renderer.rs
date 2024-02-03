@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_void, CStr},
+    ffi::{c_void, CStr, CString},
     mem,
     path::PathBuf,
     ptr,
@@ -31,7 +31,7 @@ pub struct CubeRenderer {
     indices: Vec<u32>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct SpotLightUniform {
     position: i32,
     diffuse: i32,
@@ -164,10 +164,10 @@ impl CubeRenderer {
                 let dif = template_light(i, light::Prop::Diffuse);
                 let spec = template_light(i, light::Prop::Specular);
                 let stren = template_light(i, light::Prop::Strength);
-                let position = CStr::from_bytes_with_nul_unchecked(pos.as_bytes());
-                let diffuse = CStr::from_bytes_with_nul_unchecked(dif.as_bytes());
-                let specular = CStr::from_bytes_with_nul_unchecked(spec.as_bytes());
-                let strength = CStr::from_bytes_with_nul_unchecked(stren.as_bytes());
+                let position = CString::new(pos.as_bytes()).unwrap();
+                let diffuse = CString::new(dif.as_bytes()).unwrap();
+                let specular = CString::new(spec.as_bytes()).unwrap();
+                let strength = CString::new(stren.as_bytes()).unwrap();
                 lights[i] = SpotLightUniform {
                     position: gl::GetUniformLocation(program, position.as_ptr()),
                     diffuse: gl::GetUniformLocation(program, diffuse.as_ptr()),
@@ -175,7 +175,6 @@ impl CubeRenderer {
                     strength: gl::GetUniformLocation(program, strength.as_ptr()),
                 };
             }
-
             Ok(Self {
                 shader_id: program,
                 vao,
