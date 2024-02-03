@@ -3,8 +3,10 @@ mod config;
 mod controller;
 mod light;
 mod model;
+mod render;
 mod shader;
 mod shape;
+mod state;
 
 extern crate glfw;
 extern crate image;
@@ -12,19 +14,21 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
-use std::f32::consts::PI;
 use std::time::Instant;
+use std::{f32::consts::PI, path::PathBuf};
 
 use camera::Camera;
 use controller::{Button, Controller};
 use gl::types::*;
 use glfw::Context;
-use model::{ModelBuilder, Material};
-use na::{vector, Perspective3, Rotation3, Translation3, Unit, Vector3};
+use model::{Material, ModelBuilder};
+use na::{vector, Matrix4, Perspective3, Rotation3, Translation3, Unit, Vector3};
 use rand::Rng;
+use render::box_renderer::CubeRenderer;
 use shader::Shader;
 use shape::{TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES};
-use tracing::Level;
+use state::Cube;
+use tracing::{Level, debug};
 
 fn main() {
     // Log setup
@@ -91,7 +95,7 @@ fn main() {
                 light_start_position.1,
                 light_start_position.2,
             ))
-            .set_scale(0.3)
+            .set_scale((0.3, 0.3, 0.3))
             .init()
             .add_uniform3f(color_uniform, (0.0, 1.0, 0.0))
             .unwrap()
@@ -114,7 +118,7 @@ fn main() {
                 light2_start_position.1,
                 light2_start_position.2,
             ))
-            .set_scale(0.3)
+            .set_scale((0.3, 0.3, 0.3))
             .init()
             .add_uniform3f(color_uniform, (1.0, 0.0, 1.0))
             .unwrap()
@@ -128,37 +132,29 @@ fn main() {
         .unwrap();
     let mut light2 = light::Light::new(light2_model, (1.0, 0.0, 1.0), (1.0, 0.0, 1.0), 80.0);
 
-    let texture_shader_program =
-        Shader::new(config::CUBE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
-    let model_material = Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128);
-    let mut model = ModelBuilder::new(
-        TEXTURED_CUBE_VERTICES.into(),
-        TEXTURED_CUBE_INDICES.into(),
-        texture_shader_program,
-    )
-    .add_texture(String::from(config::WALL_TEXTURE))
-    .add_normals()
-    .init()
-    .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
-    .unwrap()
-    .add_uniform_mat4(view_uniform, view)
-    .unwrap()
-    .add_light(light.as_light_uniforms())
-    .unwrap()
-    .add_light(light2.as_light_uniforms())
-    .unwrap()
-    .set_material(model_material)
-    .unwrap()
-    .add_uniform3f(camera_position_uniform, camera.position())
-    .unwrap()
-    .add_uniform1f(offset_uniform, 0.0)
-    .unwrap();
-    let world_space_operation = model.world_space_operation();
-    model = model
-        .add_uniform_mat4(transformation_uniform, world_space_operation)
-        .unwrap();
+    let cube_vert_shader = PathBuf::from(config::CUBE_VERT_SHADER);
+    let texture_frag_shader = PathBuf::from(config::TEXTURE_FRAG_SHADER);
+    let texture = image::open(config::WALL_TEXTURE).unwrap();
+    let cube_renderer = CubeRenderer::new(
+        &cube_vert_shader,
+        &texture_frag_shader,
+        &TEXTURED_CUBE_VERTICES,
+        &TEXTURED_CUBE_INDICES,
+        texture,
+    ).unwrap();
+    let mut cube_list = Vec::new();
+    let mut player_cube = Cube {
+        transform: state::Transform {
+            position: (0.0, 0.0, 0.0).into(),
+            scale: (1.0, 1.0, 1.0).into(),
+            rotation: Matrix4::identity(),
+        },
+        material: Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128),
+    };
+    cube_list.push(player_cube);
 
-    let plane_shader_program = Shader::new(config::PLANE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
+    let plane_shader_program =
+        Shader::new(config::PLANE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
     let plane_material = Material::new((0.2, 0.2, 0.1), (0.5, 0.5, 0.2), (0.5, 0.5, 0.4), 64);
     let mut plane = ModelBuilder::new(
         shape::QUAD_VERTICES.into(),
@@ -166,7 +162,7 @@ fn main() {
         plane_shader_program,
     )
     .add_texture(String::from(config::WALL_TEXTURE))
-    .set_scale(100.0)
+    .set_scale((30.0, 100.0, 0.0))
     .set_rotation(Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous())
     .add_transform(Translation3::new(0.0, -0.5, 0.0))
     .init()
@@ -214,8 +210,7 @@ fn main() {
         }
         let (x, y) = controller.direction();
         y_pos += y * move_step_size;
-        model.transform =
-            Translation3::new(x * move_step_size, 0.0, 0.0) * model.transform;
+        player_cube.transform.position.x += x * move_step_size;
         let (cx, cy, zoom) = controller.mouse();
         let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
         let max_cy = config::MAX_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
@@ -242,53 +237,22 @@ fn main() {
         light.specular.0 = time_since_start.sin();
 
         clear();
-        camera.target = model.transform.vector;
+        camera.target = Translation3::new(
+            player_cube.transform.position.x,
+            player_cube.transform.position.y,
+            player_cube.transform.position.z,
+        ).vector;
         view = camera.transform();
-        for i in 0..random_offsets.len() {
-            let now = Instant::now().duration_since(start).as_secs_f32();
-            let time_offset = if i % 3 == 0 { now } else { 0.0 };
-            let axis: Unit<Vector3<f32>> = Unit::new_normalize(vector![
-                random_offsets[i] % 12.0,
-                random_offsets[i] % 11.0,
-                random_offsets[i] % 3.0
-            ]);
-            let rotation_offset =
-                Rotation3::from_axis_angle(&axis, (random_offsets[i] + time_offset) % 111 as f32)
-                    .to_homogeneous();
-            let transformation_offset = Translation3::new(
-                (random_offsets[i] % 19.0) - 9.5,
-                (random_offsets[i] % 21.0) - 10.5,
-                -random_offsets[i] % 31.0 - y_pos,
-            )
-            .to_homogeneous();
-            if i == 0 {
-                model
-                    .set_uniform_mat4(transformation_uniform, model.world_space_operation())
-                    .unwrap();
-            } else {
-                model
-                    .set_uniform_mat4(
-                        transformation_uniform,
-                        transformation_offset * rotation_offset,
-                    )
-                    .unwrap();
-            }
-            model
-                .set_uniform_mat4(projection_uniform, projection.as_matrix().clone())
-                .unwrap();
-            model.set_uniform_mat4(view_uniform, view).unwrap();
-            model.set_light(0, light.as_light_uniforms());
-            model.set_light(1, light2.as_light_uniforms());
-            model
-                .set_uniform3f(camera_position_uniform, camera.position())
-                .unwrap();
-            model.draw();
-        }
+        let lights = vec![light.as_light_uniforms(), light2.as_light_uniforms()];
+        let camera_position = camera.position();
+        cube_renderer.draw(&cube_list, &lights, &camera_position.into(), view, projection.as_matrix().clone());
         plane.set_uniform_mat4(view_uniform, view).unwrap();
         plane.set_light(0, light.as_light_uniforms());
         plane.set_light(1, light2.as_light_uniforms());
-        plane.set_uniform3f(camera_position_uniform, camera.position()).unwrap();
-        plane.set_uniform1f(offset_uniform, y_pos / plane.scale);
+        plane
+            .set_uniform3f(camera_position_uniform, camera.position())
+            .unwrap();
+        plane.set_uniform1f(offset_uniform, y_pos / plane.scale.1);
         plane.draw();
         light.model.set_uniform_mat4(view_uniform, view).unwrap();
         light

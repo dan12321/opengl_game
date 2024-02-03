@@ -16,7 +16,7 @@ pub struct Model<const R: usize, const S: usize> {
     pub indices: [GLuint; S],
     pub transform: Translation3<GLfloat>,
     pub rotation: Matrix4<GLfloat>,
-    pub scale: GLfloat,
+    pub scale: (GLfloat, GLfloat, GLfloat),
     pub shader: Shader,
     vao: u32,
     vbo: u32,
@@ -30,7 +30,7 @@ impl<const R: usize, const S: usize> Model<R, S> {
     pub fn world_space_operation(&self) -> Matrix4<GLfloat> {
         self.transform.to_homogeneous()
             * self.rotation
-            * na::Scale3::new(self.scale, self.scale, self.scale).to_homogeneous()
+            * na::Scale3::new(self.scale.0, self.scale.1, self.scale.2).to_homogeneous()
     }
 
     pub fn draw(&self) {
@@ -181,7 +181,7 @@ pub struct ModelBuilder<const R: usize, const S: usize> {
     shader: Shader,
     transform: Option<Translation3<GLfloat>>,
     rotation: Option<Matrix4<GLfloat>>,
-    scale: GLfloat,
+    scale: (GLfloat, GLfloat, GLfloat),
     textures: [Option<String>; 32],
     textures_count: usize,
     normals: bool,
@@ -195,7 +195,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
             shader,
             transform: None,
             rotation: None,
-            scale: 1.0,
+            scale: (1.0, 1.0, 1.0),
             textures: Default::default(),
             textures_count: 0,
             normals: false,
@@ -212,7 +212,7 @@ impl<const R: usize, const S: usize> ModelBuilder<R, S> {
         self
     }
 
-    pub fn set_scale(mut self, scale: GLfloat) -> Self {
+    pub fn set_scale(mut self, scale: (GLfloat, GLfloat, GLfloat)) -> Self {
         self.scale = scale;
         self
     }
@@ -383,11 +383,12 @@ const GL_TEXTURES: [GLenum; 32] = [
     gl::TEXTURE31,
 ];
 
+#[derive(Copy, Clone, Debug)]
 pub struct Material {
-    ambient: (f32, f32, f32),
-    diffuse: (f32, f32, f32),
-    specular: (f32, f32, f32),
-    shininess: GLint,
+    pub ambient: (f32, f32, f32),
+    pub diffuse: (f32, f32, f32),
+    pub specular: (f32, f32, f32),
+    pub shininess: GLint,
 }
 
 impl Material {
