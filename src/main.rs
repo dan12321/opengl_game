@@ -14,7 +14,9 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
+use std::io::Read;
 use std::time::Instant;
+use std::collections::VecDeque;
 use std::{f32::consts::PI, path::PathBuf};
 
 use camera::Camera;
@@ -142,7 +144,7 @@ fn main() {
         &TEXTURED_CUBE_INDICES,
         texture,
     ).unwrap();
-    let mut cube_list = Vec::new();
+    let mut cube_list = Vec::with_capacity(64);
     let mut player_cube = Cube {
         transform: state::Transform {
             position: (0.0, 0.0, 0.0).into(),
@@ -151,7 +153,22 @@ fn main() {
         },
         material: Material::new((0.1, 0.1, 0.1), (1.0, 1.0, 1.0), (0.7, 0.7, 0.7), 128),
     };
-    cube_list.push(player_cube);
+    let cube_material = Material::new((0.5, 0.1, 0.1), (1.0, 0.7, 0.7), (1.0, 0.7, 0.7), 128);
+    let positions = [
+        (5.0, 0.0, -10.0),
+        (-5.0, 0.0, -10.0),
+        (0.0, 0.0, -15.0),
+    ];
+    for position in positions {
+        cube_list.push(Cube {
+            transform: state::Transform {
+                position: position.into(),
+                scale: (1.0, 1.0, 1.0).into(),
+                rotation: Matrix4::identity(),
+            },
+            material: cube_material,
+        });
+    }
 
     let plane_shader_program =
         Shader::new(config::PLANE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
@@ -203,13 +220,14 @@ fn main() {
         let time_since_start = current_time.duration_since(start).as_secs_f32();
         let time_delta = current_time.duration_since(last_time);
         let move_step_size = config::MOVE_SPEED * time_delta.as_secs_f32();
+        let treadmil_speed = time_since_start / 100.0;
         for button in controller.buttons() {
             match button {
                 Button::Quit => window.set_should_close(true),
             }
         }
         let (x, y) = controller.direction();
-        y_pos += y * move_step_size;
+        y_pos -= treadmil_speed;
         player_cube.transform.position.x += x * move_step_size;
         let (cx, cy, zoom) = controller.mouse();
         let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
@@ -231,7 +249,7 @@ fn main() {
             light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0) - y_pos,
         );
 
-        light2.model.transform.z -= y * move_step_size;
+        light2.model.transform.z = -y_pos;
 
         light.diffuse.0 = time_since_start.sin();
         light.specular.0 = time_since_start.sin();
@@ -245,7 +263,18 @@ fn main() {
         view = camera.transform();
         let lights = vec![light.as_light_uniforms(), light2.as_light_uniforms()];
         let camera_position = camera.position();
-        cube_renderer.draw(&cube_list, &lights, &camera_position.into(), view, projection.as_matrix().clone());
+        let mut cubes_to_render = Vec::with_capacity(cube_list.len());
+        for cube in &mut cube_list {
+
+            if cube.transform.position.z > y_pos + 20.0 {
+                cube.transform.position.z = y_pos - 50.0;
+            }
+            let mut c = cube.clone();
+            c.transform.position.z -= y_pos;
+            cubes_to_render.push(c);
+        }
+        cubes_to_render.push(player_cube);
+        cube_renderer.draw(&cubes_to_render, &lights, &camera_position.into(), view, projection.as_matrix().clone());
         plane.set_uniform_mat4(view_uniform, view).unwrap();
         plane.set_light(0, light.as_light_uniforms());
         plane.set_light(1, light2.as_light_uniforms());

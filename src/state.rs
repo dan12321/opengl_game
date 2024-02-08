@@ -8,7 +8,7 @@ pub struct GameState {
 //    box_renderer: Renderer,
 //    light_renderer: Renderer,
 //    plane_renderer: Renderer,
-    player: Player,
+    player: Cube,
     speed: f32,
     plane: Plane,
 }
