@@ -2,7 +2,6 @@ use std::sync::mpsc::Receiver;
 
 use super::config::{MAX_ZOOM, MIN_ZOOM, SCROLL_ZOOM_SCALE};
 use glfw::{Action, Glfw, Key, WindowEvent};
-use tracing::debug;
 
 pub struct Controller<'a> {
     direction_x: f32,

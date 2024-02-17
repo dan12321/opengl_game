@@ -14,9 +14,7 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
-use std::io::Read;
 use std::time::Instant;
-use std::collections::VecDeque;
 use std::{f32::consts::PI, path::PathBuf};
 
 use camera::Camera;
@@ -24,13 +22,13 @@ use controller::{Button, Controller};
 use gl::types::*;
 use glfw::Context;
 use model::{Material, ModelBuilder};
-use na::{vector, Matrix4, Perspective3, Rotation3, Translation3, Unit, Vector3};
+use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
 use rand::Rng;
 use render::cube_renderer::CubeRenderer;
 use shader::Shader;
 use shape::{TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES};
 use state::Cube;
-use tracing::{Level, debug};
+use tracing::Level;
 
 fn main() {
     // Log setup

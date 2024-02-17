@@ -12,7 +12,6 @@ use na::Matrix4;
 use crate::{
     light::{self, template_light, LightUniform},
     shader::{create_shader, OpenGLError},
-    shape::{CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES},
     state::{Cube, Transform, XYZ},
 };
 
