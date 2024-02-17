@@ -1,1 +1,1 @@
-pub mod box_renderer;
+pub mod cube_renderer;

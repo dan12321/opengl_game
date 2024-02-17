@@ -26,7 +26,7 @@ use glfw::Context;
 use model::{Material, ModelBuilder};
 use na::{vector, Matrix4, Perspective3, Rotation3, Translation3, Unit, Vector3};
 use rand::Rng;
-use render::box_renderer::CubeRenderer;
+use render::cube_renderer::CubeRenderer;
 use shader::Shader;
 use shape::{TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES};
 use state::Cube;
@@ -163,7 +163,7 @@ fn main() {
         cube_list.push(Cube {
             transform: state::Transform {
                 position: position.into(),
-                scale: (1.0, 1.0, 1.0).into(),
+                scale: (2.0, 1.0, 1.0).into(),
                 rotation: Matrix4::identity(),
             },
             material: cube_material,
@@ -220,14 +220,14 @@ fn main() {
         let time_since_start = current_time.duration_since(start).as_secs_f32();
         let time_delta = current_time.duration_since(last_time);
         let move_step_size = config::MOVE_SPEED * time_delta.as_secs_f32();
-        let treadmil_speed = time_since_start / 100.0;
+        let treadmill_speed = time_since_start / 100.0;
         for button in controller.buttons() {
             match button {
                 Button::Quit => window.set_should_close(true),
             }
         }
-        let (x, y) = controller.direction();
-        y_pos -= treadmil_speed;
+        let (x, _) = controller.direction();
+        y_pos -= treadmill_speed;
         player_cube.transform.position.x += x * move_step_size;
         let (cx, cy, zoom) = controller.mouse();
         let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
@@ -268,6 +268,7 @@ fn main() {
 
             if cube.transform.position.z > y_pos + 20.0 {
                 cube.transform.position.z = y_pos - 50.0;
+                cube.transform.position.x = rng.gen_range(0.0..30.0) - 15.0;
             }
             let mut c = cube.clone();
             c.transform.position.z -= y_pos;
