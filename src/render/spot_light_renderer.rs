@@ -64,7 +64,6 @@ impl SpotLightRenderer {
             gl::GenBuffers(1, &mut ebo);
             gl::BindVertexArray(vao);
             gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
             gl::BufferData(
                 gl::ARRAY_BUFFER,
                 (vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
@@ -77,6 +76,7 @@ impl SpotLightRenderer {
                 &indices[0] as *const _ as *const c_void,
                 gl::STATIC_DRAW,
             );
+            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
 
             let stride = 3 * mem::size_of::<GLfloat>() as i32;
             gl::VertexAttribPointer(
@@ -87,6 +87,7 @@ impl SpotLightRenderer {
                 stride,
                 ptr::null()
             );
+            gl::EnableVertexAttribArray(0);
             
             // Get Uniforms
             let projection_uniform = gl::GetUniformLocation(program, PROJECTION.as_ptr());

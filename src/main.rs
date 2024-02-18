@@ -88,52 +88,6 @@ fn main() {
     let mut camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
     let mut view = camera.transform();
 
-    let light_shader = Shader::new(config::LIGHT_VERT_SHADER, config::LIGHT_FRAG_SHADER).unwrap();
-    let light_start_position = (0.0, 2.0, 0.0);
-    let mut light_model =
-        model::ModelBuilder::new(shape::CUBE_VERTICES, shape::CUBE_INDICES, light_shader)
-            .add_transform(Translation3::new(
-                light_start_position.0,
-                light_start_position.1,
-                light_start_position.2,
-            ))
-            .set_scale((0.3, 0.3, 0.3))
-            .init()
-            .add_uniform3f(color_uniform, (0.0, 1.0, 0.0))
-            .unwrap()
-            .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
-            .unwrap()
-            .add_uniform_mat4(view_uniform, view)
-            .unwrap();
-    let light_wso = light_model.world_space_operation();
-    light_model = light_model
-        .add_uniform_mat4(transformation_uniform, light_wso)
-        .unwrap();
-    let mut light = light::Light::new(light_model, (0.2, 1.0, 0.8), (0.2, 1.0, 0.8), 50.0);
-
-    let light2_shader = Shader::new(config::LIGHT_VERT_SHADER, config::LIGHT_FRAG_SHADER).unwrap();
-    let light2_start_position = (0.0, 0.0, -10.0);
-    let mut light2_model =
-        model::ModelBuilder::new(shape::CUBE_VERTICES, shape::CUBE_INDICES, light2_shader)
-            .add_transform(Translation3::new(
-                light2_start_position.0,
-                light2_start_position.1,
-                light2_start_position.2,
-            ))
-            .set_scale((0.3, 0.3, 0.3))
-            .init()
-            .add_uniform3f(color_uniform, (1.0, 0.0, 1.0))
-            .unwrap()
-            .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
-            .unwrap()
-            .add_uniform_mat4(view_uniform, view)
-            .unwrap();
-    let light2_wso = light2_model.world_space_operation();
-    light2_model = light2_model
-        .add_uniform_mat4(transformation_uniform, light2_wso)
-        .unwrap();
-    let mut light2 = light::Light::new(light2_model, (1.0, 0.0, 1.0), (1.0, 0.0, 1.0), 80.0);
-    
     let plat_width = 30.0;
     let light_vert_shader = PathBuf::from(config::LIGHT_VERT_SHADER);
     let light_frag_shader = PathBuf::from(config::LIGHT_FRAG_SHADER);
@@ -147,20 +101,44 @@ fn main() {
     let mut lights = Vec::with_capacity(64);
     for i in 0..=4 {
         let n = i as f32;
-        let x = (n / 4.0) * plat_width;
-        let z = -n * n + 4.0 * n;
+        let x = (n / 4.0) * plat_width - (plat_width / 2.0);
+        let z = 2.0 * (-n * n + 4.0 * n);
         let light1_transform = Transform {
-            position: (x, 5.0, z).into(),
+            position: (x, z, -10.0).into(),
             scale: (0.5, 0.5, 0.5).into(),
             rotation: Matrix4::identity(),
         };
-        let light = Light {
+        let light2_transform = Transform {
+            position: (x, z, -50.0).into(),
+            scale: (0.5, 0.5, 0.5).into(),
+            rotation: Matrix4::identity(),
+        };
+        let light3_transform = Transform {
+            position: (x, z, -90.0).into(),
+            scale: (0.5, 0.5, 0.5).into(),
+            rotation: Matrix4::identity(),
+        };
+        let light1 = Light {
             transform: light1_transform,
             diffuse: (1.0, 1.0, 1.0),
             specular: (1.0, 1.0, 1.0),
-            strength: 1.0,
+            strength: 50.0,
         };
-        lights.push(light);
+        let light2 = Light {
+            transform: light2_transform,
+            diffuse: (1.0, 1.0, 1.0),
+            specular: (1.0, 1.0, 1.0),
+            strength: 50.0,
+        };
+        let light3 = Light {
+            transform: light3_transform,
+            diffuse: (1.0, 1.0, 1.0),
+            specular: (1.0, 1.0, 1.0),
+            strength: 50.0,
+        };
+        lights.push(light1);
+        lights.push(light2);
+        lights.push(light3);
     }
     
     let cube_vert_shader = PathBuf::from(config::CUBE_VERT_SHADER);
@@ -216,16 +194,15 @@ fn main() {
     .unwrap()
     .add_uniform_mat4(view_uniform, view)
     .unwrap()
-    .add_light(light.as_light_uniforms())
-    .unwrap()
-    .add_light(light2.as_light_uniforms())
-    .unwrap()
     .set_material(plane_material)
     .unwrap()
     .add_uniform3f(camera_position_uniform, camera.position())
     .unwrap()
     .add_uniform1f(offset_uniform, 0.0)
     .unwrap();
+    for light in &lights {
+        plane = plane.add_light(light.as_light_uniforms()).unwrap();
+    }
     let plane_space = plane.world_space_operation();
     plane = plane
         .add_uniform_mat4(transformation_uniform, plane_space)
@@ -272,17 +249,6 @@ fn main() {
         window.set_cursor_pos(cx as f64, cy_clamped as f64);
         camera.distance = camera.default_distance + zoom;
 
-        light.model.transform = Translation3::new(
-            light_start_position.0 + (time_since_start.sin() * 4.0),
-            light_start_position.1,
-            light_start_position.2 - (time_since_start.cos() * 8.0 + 8.0) - y_pos,
-        );
-
-        light2.model.transform.z = -y_pos;
-
-        light.diffuse.0 = time_since_start.sin();
-        light.specular.0 = time_since_start.sin();
-
         clear();
         camera.target = Translation3::new(
             player_cube.transform.position.x,
@@ -290,19 +256,25 @@ fn main() {
             player_cube.transform.position.z,
         ).vector;
         view = camera.transform();
+        let mut lights_to_render = Vec::with_capacity(lights.len());
+        let mut light_uniforms = Vec::with_capacity(64);
+        for light in &mut lights {
+            if light.transform.position.z > y_pos + 50.0 {
+                light.transform.position.z = y_pos - 50.0;
+            }
+            let mut l = light.clone();
+            l.transform.position.z -= y_pos;
+            lights_to_render.push(l);
+            light_uniforms.push(l.as_light_uniforms());
+        }
         light_renderer.draw(
-            &lights,
+            &lights_to_render,
             view,
             projection.as_matrix().clone(),
         );
-        let mut light_uniforms: Vec<LightUniform> = lights.iter()
-            .map(|l| l.as_light_uniforms())
-            .collect();
-        light_uniforms.append(&mut vec![light.as_light_uniforms(), light2.as_light_uniforms()]);
         let camera_position = camera.position();
         let mut cubes_to_render = Vec::with_capacity(cube_list.len());
         for cube in &mut cube_list {
-
             if cube.transform.position.z > y_pos + 20.0 {
                 cube.transform.position.z = y_pos - 50.0;
                 cube.transform.position.x = rng.gen_range(0.0..plat_width) - 15.0;
@@ -319,33 +291,14 @@ fn main() {
             view, projection.as_matrix().clone(),
         );
         plane.set_uniform_mat4(view_uniform, view).unwrap();
-        plane.set_light(0, light.as_light_uniforms());
-        plane.set_light(1, light2.as_light_uniforms());
+        for i in 0..light_uniforms.len() {
+            plane.set_light(i, light_uniforms[i].clone());
+        }
         plane
             .set_uniform3f(camera_position_uniform, camera.position())
             .unwrap();
         plane.set_uniform1f(offset_uniform, y_pos / plane.scale.1);
         plane.draw();
-        light.model.set_uniform_mat4(view_uniform, view).unwrap();
-        light
-            .model
-            .set_uniform_mat4(transformation_uniform, light.model.world_space_operation())
-            .unwrap();
-        light
-            .model
-            .set_uniform3f(color_uniform, light.specular.into())
-            .unwrap();
-        light.model.draw();
-        light2.model.set_uniform_mat4(view_uniform, view).unwrap();
-        light2
-            .model
-            .set_uniform_mat4(transformation_uniform, light2.model.world_space_operation())
-            .unwrap();
-        light2
-            .model
-            .set_uniform3f(color_uniform, light2.specular.into())
-            .unwrap();
-        light2.model.draw();
         last_time = current_time;
     }
 }

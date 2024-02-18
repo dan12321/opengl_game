@@ -9,7 +9,7 @@ pub struct Light<const R: usize, const S: usize> {
     pub strength: GLfloat,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct LightUniform {
     pub position: (GLfloat, GLfloat, GLfloat),
     pub diffuse: (GLfloat, GLfloat, GLfloat),
