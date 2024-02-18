@@ -21,13 +21,15 @@ use camera::Camera;
 use controller::{Button, Controller};
 use gl::types::*;
 use glfw::Context;
+use light::LightUniform;
 use model::{Material, ModelBuilder};
 use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
 use rand::Rng;
 use render::cube_renderer::CubeRenderer;
+use render::spot_light_renderer::SpotLightRenderer;
 use shader::Shader;
-use shape::{TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES};
-use state::Cube;
+use shape::{TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES, CUBE_VERTICES, CUBE_INDICES};
+use state::{Cube, Light, Transform};
 use tracing::Level;
 
 fn main() {
@@ -131,7 +133,36 @@ fn main() {
         .add_uniform_mat4(transformation_uniform, light2_wso)
         .unwrap();
     let mut light2 = light::Light::new(light2_model, (1.0, 0.0, 1.0), (1.0, 0.0, 1.0), 80.0);
+    
+    let plat_width = 30.0;
+    let light_vert_shader = PathBuf::from(config::LIGHT_VERT_SHADER);
+    let light_frag_shader = PathBuf::from(config::LIGHT_FRAG_SHADER);
+    let light_renderer = SpotLightRenderer::new(
+        &light_vert_shader,
+        &light_frag_shader,
+        &CUBE_VERTICES,
+        &CUBE_INDICES,
+    ).unwrap();
 
+    let mut lights = Vec::with_capacity(64);
+    for i in 0..=4 {
+        let n = i as f32;
+        let x = (n / 4.0) * plat_width;
+        let z = -n * n + 4.0 * n;
+        let light1_transform = Transform {
+            position: (x, 5.0, z).into(),
+            scale: (0.5, 0.5, 0.5).into(),
+            rotation: Matrix4::identity(),
+        };
+        let light = Light {
+            transform: light1_transform,
+            diffuse: (1.0, 1.0, 1.0),
+            specular: (1.0, 1.0, 1.0),
+            strength: 1.0,
+        };
+        lights.push(light);
+    }
+    
     let cube_vert_shader = PathBuf::from(config::CUBE_VERT_SHADER);
     let texture_frag_shader = PathBuf::from(config::TEXTURE_FRAG_SHADER);
     let texture = image::open(config::WALL_TEXTURE).unwrap();
@@ -177,7 +208,7 @@ fn main() {
         plane_shader_program,
     )
     .add_texture(String::from(config::WALL_TEXTURE))
-    .set_scale((30.0, 100.0, 0.0))
+    .set_scale((plat_width, 100.0, 0.0))
     .set_rotation(Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous())
     .add_transform(Translation3::new(0.0, -0.5, 0.0))
     .init()
@@ -259,21 +290,34 @@ fn main() {
             player_cube.transform.position.z,
         ).vector;
         view = camera.transform();
-        let lights = vec![light.as_light_uniforms(), light2.as_light_uniforms()];
+        light_renderer.draw(
+            &lights,
+            view,
+            projection.as_matrix().clone(),
+        );
+        let mut light_uniforms: Vec<LightUniform> = lights.iter()
+            .map(|l| l.as_light_uniforms())
+            .collect();
+        light_uniforms.append(&mut vec![light.as_light_uniforms(), light2.as_light_uniforms()]);
         let camera_position = camera.position();
         let mut cubes_to_render = Vec::with_capacity(cube_list.len());
         for cube in &mut cube_list {
 
             if cube.transform.position.z > y_pos + 20.0 {
                 cube.transform.position.z = y_pos - 50.0;
-                cube.transform.position.x = rng.gen_range(0.0..30.0) - 15.0;
+                cube.transform.position.x = rng.gen_range(0.0..plat_width) - 15.0;
             }
             let mut c = cube.clone();
             c.transform.position.z -= y_pos;
             cubes_to_render.push(c);
         }
         cubes_to_render.push(player_cube);
-        cube_renderer.draw(&cubes_to_render, &lights, &camera_position.into(), view, projection.as_matrix().clone());
+        cube_renderer.draw(
+            &cubes_to_render,
+            &light_uniforms,
+            &camera_position.into(),
+            view, projection.as_matrix().clone(),
+        );
         plane.set_uniform_mat4(view_uniform, view).unwrap();
         plane.set_light(0, light.as_light_uniforms());
         plane.set_light(1, light2.as_light_uniforms());

@@ -18,8 +18,6 @@ use crate::{
 pub struct CubeRenderer {
     shader_id: u32,
     vao: u32,
-    vbo: u32,
-    ebo: u32,
     texture: u32,
     view_uniform: i32,
     projection_uniform: i32,
@@ -177,8 +175,6 @@ impl CubeRenderer {
             Ok(Self {
                 shader_id: program,
                 vao,
-                vbo,
-                ebo,
                 texture: texture_location,
                 indices: indices.to_vec(),
                 material_uniform: material,

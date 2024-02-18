@@ -1,6 +1,6 @@
 use na::Matrix4;
 
-use crate::model::Material;
+use crate::{model::Material, light::LightUniform};
 
 pub struct GameState {
     cubes: [Cube; 128],
@@ -21,9 +21,22 @@ pub struct Cube {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Light {
-    transform: Transform,
-    diffuse: (f32, f32, f32),
-    specular: (f32, f32, f32),
+    pub transform: Transform,
+    pub diffuse: (f32, f32, f32),
+    pub specular: (f32, f32, f32),
+    pub strength: f32,
+}
+
+impl Light {
+    pub fn as_light_uniforms(&self) -> LightUniform {
+        let pos = self.transform.position;
+        LightUniform {
+            position: (pos.x, pos.y, pos.z),
+            diffuse: self.diffuse,
+            specular: self.specular,
+            strength: self.strength,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
