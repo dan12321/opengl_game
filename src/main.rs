@@ -25,10 +25,11 @@ use model::{Material, ModelBuilder};
 use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
 use rand::Rng;
 use render::cube_renderer::CubeRenderer;
+use render::plane_renderer::PlaneRenderer;
 use render::spot_light_renderer::SpotLightRenderer;
 use shader::Shader;
-use shape::{CUBE_INDICES, CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES};
-use state::{Cube, Light, Transform};
+use shape::{CUBE_INDICES, CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES, QUAD_VERTICES, QUAD_INDICES};
+use state::{Cube, Light, Transform, Plane};
 use tracing::Level;
 
 fn main() {
@@ -173,36 +174,26 @@ fn main() {
         });
     }
 
-    let plane_shader_program =
-        Shader::new(config::PLANE_VERT_SHADER, config::TEXTURE_FRAG_SHADER).unwrap();
+    let plane_vert_shader = PathBuf::from(config::PLANE_VERT_SHADER);
+    let texture = image::open(config::WALL_TEXTURE).unwrap();
+    let plane_renderer = PlaneRenderer::new(
+        &plane_vert_shader,
+        &texture_frag_shader,
+        &QUAD_VERTICES,
+        &QUAD_INDICES,
+        texture,
+    ).unwrap();
     let plane_material = Material::new((0.2, 0.2, 0.1), (0.5, 0.5, 0.2), (0.5, 0.5, 0.4), 64);
-    let mut plane = ModelBuilder::new(
-        shape::QUAD_VERTICES.into(),
-        shape::QUAD_INDICES.into(),
-        plane_shader_program,
-    )
-    .add_texture(String::from(config::WALL_TEXTURE))
-    .set_scale((plat_width, 100.0, 0.0))
-    .set_rotation(Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous())
-    .add_transform(Translation3::new(0.0, -0.5, 0.0))
-    .init()
-    .add_uniform_mat4(projection_uniform, projection.as_matrix().clone())
-    .unwrap()
-    .add_uniform_mat4(view_uniform, view)
-    .unwrap()
-    .set_material(plane_material)
-    .unwrap()
-    .add_uniform3f(camera_position_uniform, camera.position())
-    .unwrap()
-    .add_uniform1f(offset_uniform, 0.0)
-    .unwrap();
-    for light in &lights {
-        plane = plane.add_light(light.as_light_uniforms()).unwrap();
-    }
-    let plane_space = plane.world_space_operation();
-    plane = plane
-        .add_uniform_mat4(transformation_uniform, plane_space)
-        .unwrap();
+    let plat_length = 100.0;
+    let mut plane = Plane {
+        transform: Transform {
+            position: (0.0, -0.5, 0.0).into(),
+            scale: (plat_width, plat_length, 0.0).into(),
+            rotation: Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous()
+        },
+        material: plane_material,
+        offset: 0.0,
+    };
 
     let mut rng = rand::thread_rng();
     let mut random_offsets = [0.0; 10];
@@ -284,15 +275,15 @@ fn main() {
             view,
             projection.as_matrix().clone(),
         );
-        plane.set_uniform_mat4(view_uniform, view).unwrap();
-        for i in 0..light_uniforms.len() {
-            plane.set_light(i, light_uniforms[i].clone());
-        }
-        plane
-            .set_uniform3f(camera_position_uniform, camera.position())
-            .unwrap();
-        plane.set_uniform1f(offset_uniform, y_pos / plane.scale.1);
-        plane.draw();
+
+        plane.offset = y_pos / plat_length;
+        plane_renderer.draw(
+            &[plane],
+            &light_uniforms,
+            &camera_position.into(),
+            view,
+            projection.as_matrix().clone(),
+        );
         last_time = current_time;
     }
 }

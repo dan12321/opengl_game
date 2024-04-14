@@ -20,6 +20,13 @@ pub struct Cube {
 }
 
 #[derive(Copy, Clone, Debug)]
+pub struct Plane {
+    pub transform: Transform,
+    pub material: Material,
+    pub offset: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
 pub struct Light {
     pub transform: Transform,
     pub diffuse: (f32, f32, f32),
@@ -42,11 +49,6 @@ impl Light {
 #[derive(Copy, Clone, Debug)]
 pub struct Player {
     transform: Transform,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Plane {
-    offset: f32,
 }
 
 #[derive(Copy, Clone, Debug)]
