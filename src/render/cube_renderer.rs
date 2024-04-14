@@ -12,7 +12,7 @@ use na::Matrix4;
 use crate::{
     light::{self, template_light, LightUniform},
     shader::{create_shader, OpenGLError},
-    state::{Cube, Transform, XYZ},
+    state::{Cube, XYZ},
 };
 
 pub struct CubeRenderer {
