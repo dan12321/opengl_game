@@ -21,13 +21,12 @@ use camera::Camera;
 use controller::{Button, Controller};
 use gl::types::*;
 use glfw::Context;
-use model::{Material, ModelBuilder};
+use model::Material;
 use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
 use rand::Rng;
 use render::cube_renderer::CubeRenderer;
 use render::plane_renderer::PlaneRenderer;
 use render::spot_light_renderer::SpotLightRenderer;
-use shader::Shader;
 use shape::{CUBE_INDICES, CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES, QUAD_VERTICES, QUAD_INDICES};
 use state::{Cube, Light, Transform, Plane};
 use tracing::Level;
@@ -74,18 +73,12 @@ fn main() {
     }
 
     // Program Setup
-    let transformation_uniform = "transformation";
-    let projection_uniform = "projection";
-    let view_uniform = "view";
-    let camera_position_uniform = "cameraPosition";
-    let offset_uniform = "offset";
     let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
     let fovy: GLfloat = PI / 2.0;
     let znear: GLfloat = 0.1;
     let zfar: GLfloat = 100.0;
     let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
     let mut camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
-    let mut view = camera.transform();
 
     let plat_width = 30.0;
     let light_vert_shader = PathBuf::from(config::LIGHT_VERT_SHADER);
@@ -243,7 +236,7 @@ fn main() {
             player_cube.transform.position.z,
         )
         .vector;
-        view = camera.transform();
+        let view = camera.transform();
         let mut lights_to_render = Vec::with_capacity(lights.len());
         let mut light_uniforms = Vec::with_capacity(64);
         for light in &mut lights {
