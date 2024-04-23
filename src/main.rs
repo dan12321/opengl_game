@@ -213,14 +213,14 @@ fn main() {
         let time_since_start = current_time.duration_since(start).as_secs_f32();
         let time_delta = current_time.duration_since(last_time);
         let move_step_size = config::MOVE_SPEED * time_delta.as_secs_f32();
-        let treadmill_speed = time_since_start / 100.0;
+        let treadmill_speed = time_since_start / 10.0 + 1.0;
         for button in controller.buttons() {
             match button {
                 Button::Quit => window.set_should_close(true),
             }
         }
         let (x, _) = controller.direction();
-        y_pos -= treadmill_speed;
+        y_pos -= treadmill_speed * move_step_size;
         player_cube.transform.position.x += x * move_step_size;
         let (cx, cy, zoom) = controller.mouse();
         let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
