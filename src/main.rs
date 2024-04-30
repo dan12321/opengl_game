@@ -7,6 +7,7 @@ mod render;
 mod shader;
 mod shape;
 mod state;
+mod physics;
 
 extern crate glfw;
 extern crate image;
@@ -23,13 +24,14 @@ use gl::types::*;
 use glfw::Context;
 use model::Material;
 use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
+use physics::AABBColider;
 use rand::Rng;
 use render::cube_renderer::CubeRenderer;
 use render::plane_renderer::PlaneRenderer;
 use render::spot_light_renderer::SpotLightRenderer;
 use shape::{CUBE_INDICES, CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES, QUAD_VERTICES, QUAD_INDICES};
 use state::{Cube, Light, Transform, Plane};
-use tracing::Level;
+use tracing::{Level, debug};
 
 fn main() {
     // Log setup
@@ -160,7 +162,7 @@ fn main() {
         cube_list.push(Cube {
             transform: state::Transform {
                 position: position.into(),
-                scale: (2.0, 1.0, 1.0).into(),
+                scale: (1.0, 1.0, 1.0).into(),
                 rotation: Matrix4::identity(),
             },
             material: cube_material,
@@ -194,7 +196,7 @@ fn main() {
         random_offsets[i] = rng.gen_range(0.0..4321.0);
     }
 
-    let start = Instant::now();
+    let mut start = Instant::now();
     let mut last_time = start;
 
     let mut controller = Controller::new(&mut glfw, events);
@@ -259,6 +261,20 @@ fn main() {
             let mut c = cube.clone();
             c.transform.position.z -= y_pos;
             cubes_to_render.push(c);
+        }
+        let player_collider = AABBColider {
+            position: player_cube.transform.position,
+            scale: player_cube.transform.scale,
+        };
+        for cube in &cubes_to_render {
+            let collider = AABBColider {
+                position: cube.transform.position,
+                scale: cube.transform.scale,
+            };
+            if player_collider.aabb_colided(&collider) {
+                start = Instant::now();
+                player_cube.transform.position.x = 0.0;
+            }
         }
         cubes_to_render.push(player_cube);
         cube_renderer.draw(
