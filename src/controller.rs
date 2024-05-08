@@ -6,7 +6,6 @@ use glfw::{Action, Glfw, Key, WindowEvent, Window};
 
 pub struct Controller<'a> {
     direction_x: f32,
-    direction_y: f32,
     camera_x: f32,
     camera_y: f32,
     zoom: f32,
@@ -23,7 +22,6 @@ impl<'a> Controller<'a> {
     pub fn new(glfw: &'a mut Glfw, events: Receiver<(f64, WindowEvent)>) -> Self {
         Controller {
             direction_x: 0.0,
-            direction_y: 0.0,
             camera_x: 0.0,
             camera_y: 0.0,
             zoom: 0.0,
@@ -36,26 +34,19 @@ impl<'a> Controller<'a> {
     pub fn poll_input(&mut self, window: &mut Window) {
         self.glfw.poll_events();
         let mut buttons = Vec::with_capacity(16);
+        let mut x_set = false;
         for (_, event) in glfw::flush_messages(&self.events) {
             match event {
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     buttons.push(Button::Quit);
                 }
-                WindowEvent::Key(Key::Up, _, Action::Press, _)
-                | WindowEvent::Key(Key::Down, _, Action::Release, _) => {
-                    self.direction_y += -1.0;
+                WindowEvent::Key(Key::Right, _, Action::Press, _) => {
+                    self.direction_x = 1.0;
+                    x_set = true;
                 }
-                WindowEvent::Key(Key::Down, _, Action::Press, _)
-                | WindowEvent::Key(Key::Up, _, Action::Release, _) => {
-                    self.direction_y -= -1.0;
-                }
-                WindowEvent::Key(Key::Right, _, Action::Press, _)
-                | WindowEvent::Key(Key::Left, _, Action::Release, _) => {
-                    self.direction_x += 1.0;
-                }
-                WindowEvent::Key(Key::Left, _, Action::Press, _)
-                | WindowEvent::Key(Key::Right, _, Action::Release, _) => {
-                    self.direction_x -= 1.0;
+                WindowEvent::Key(Key::Left, _, Action::Press, _) => {
+                    self.direction_x = -1.0;
+                    x_set = true;
                 }
                 WindowEvent::CursorPos(x, y) => {
                     let x = x as f32;
@@ -85,6 +76,9 @@ impl<'a> Controller<'a> {
                 _ => (),
             }
         }
+        if !x_set {
+            self.direction_x = 0.0;
+        }
         self.buttons_down = buttons;
     }
 
@@ -92,8 +86,8 @@ impl<'a> Controller<'a> {
         &self.buttons_down
     }
 
-    pub fn direction(&self) -> (f32, f32) {
-        (self.direction_x, self.direction_y)
+    pub fn direction(&self) -> f32 {
+        self.direction_x
     }
 
     pub fn mouse(&self) -> (f32, f32, f32) {

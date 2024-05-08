@@ -114,11 +114,10 @@ fn main() {
         texture,
     ).unwrap();
 
-    let mut start = Instant::now();
-    let mut last_time = start;
     let mut state = GameState::new();
-
     let mut controller = Controller::new(&mut glfw, events);
+
+    let mut last_time = Instant::now();
     while !window.should_close() {
         window.swap_buffers();
 
@@ -134,11 +133,11 @@ fn main() {
         }
 
         state.update(delta_time, &controller);
-        clear();
         
         // render
+        clear();
         let view = state.camera.transform();
-        let mut light_uniforms: Vec<LightUniform> = state.lights.iter()
+        let light_uniforms: Vec<LightUniform> = state.lights.iter()
             .map(|l| l.as_light_uniforms())
             .collect();
         //light_uniforms.push(l.as_light_uniforms());
@@ -151,7 +150,7 @@ fn main() {
             projection.as_matrix().clone(),
         );
         cube_renderer.draw(
-            &[state.player],
+            &[state.player.cube],
             &light_uniforms,
             &state.camera.position().into(),
             view,

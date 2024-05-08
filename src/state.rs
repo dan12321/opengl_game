@@ -11,7 +11,7 @@ use crate::physics::AABBColider;
 pub struct GameState {
     pub cubes: Vec<Cube>,
     pub lights: Vec<Light>,
-    pub player: Cube,
+    pub player: Player,
     speed: f32,
     pub plane: Plane,
     pub camera: Camera,
@@ -22,7 +22,7 @@ impl GameState {
         let camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
 
         let mut cubes = Vec::with_capacity(64);
-        let positions = [(2.0, 0.0, -10.0), (-2.0, 0.0, -10.0), (0.0, 0.0, -15.0)];
+        let positions = [(1.75, 0.0, -10.0), (-1.75, 0.0, -10.0), (0.0, 0.0, -15.0)];
         for position in positions {
             cubes.push(Cube {
                 transform: Transform {
@@ -81,13 +81,18 @@ impl GameState {
             camera,
             cubes,
             lights,
-            player: Cube {
-                transform: Transform {
-                    position: (0.0, 0.0, 0.0).into(),
-                    scale: (1.0, 1.0, 1.0).into(),
-                    rotation: Matrix4::identity(),
+            player: Player {
+                target_lane: 1,
+                current_lane: 1,
+                lerp: 1.0,
+                cube: Cube {
+                    transform: Transform {
+                        position: (0.0, 0.0, 0.0).into(),
+                        scale: (1.0, 1.0, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    material: PLAYER_MATERIAL,
                 },
-                material: PLAYER_MATERIAL,
             },
             speed: 1.0,
             plane: Plane {
@@ -106,10 +111,10 @@ impl GameState {
         // timing properties
         let dt = delta_time.as_secs_f32();
         self.speed += dt;
-        let move_speed = config::MOVE_SPEED * dt;
+        let displacement = config::MOVE_SPEED * dt;
         
         // controller input
-        let (x, _) = controller.direction();
+        let x = controller.direction();
         let (cx, cy, zoom) = controller.mouse();
 
         // lights update
@@ -129,19 +134,36 @@ impl GameState {
         }
 
         // player update
-        self.player.transform.position.x += x * move_speed;
-        let movable_width = PLANE_WIDTH / 2.0 - 0.5;
-        if self.player.transform.position.x > movable_width {
-            self.player.transform.position.x = movable_width;
+        if self.player.lerp > 0.999 {
+            // TODO add some leaway so a double tap moves two lanes
+            if x > 0.0 && self.player.target_lane < 2 {
+                self.player.current_lane = self.player.target_lane;
+                self.player.target_lane += 1;
+                self.player.lerp = 1.0 - self.player.lerp;
+            } else if x < 0.0 && self.player.target_lane > 0 {
+                self.player.current_lane = self.player.target_lane;
+                self.player.target_lane -= 1;
+                self.player.lerp = 1.0 - self.player.lerp;
+            }
+        } else if self.player.lerp < 1.0 {
+            self.player.lerp += displacement;
         }
-        if self.player.transform.position.x < -movable_width {
-            self.player.transform.position.x = -movable_width;
+        let start = (self.player.current_lane as f32 - 1.0) * 1.75;
+        let end = (self.player.target_lane as f32 - 1.0) * 1.75;
+        self.player.cube.transform.position.x =
+            end * self.player.lerp + start * (1.0 - self.player.lerp);
+        let movable_width = PLANE_WIDTH / 2.0 - 0.5;
+        if self.player.cube.transform.position.x > movable_width {
+            self.player.cube.transform.position.x = movable_width;
+        }
+        if self.player.cube.transform.position.x < -movable_width {
+            self.player.cube.transform.position.x = -movable_width;
         }
 
         // Check collisions
         let player_collider = AABBColider {
-            position: self.player.transform.position,
-            scale: self.player.transform.scale,
+            position: self.player.cube.transform.position,
+            scale: self.player.cube.transform.scale,
         };
         for cube in &self.cubes {
             let collider = AABBColider {
@@ -150,19 +172,20 @@ impl GameState {
             };
             if player_collider.aabb_colided(&collider) {
                 self.speed = 1.0;
-                self.player.transform.position.x = 0.0;
+                self.player.cube.transform.position.x = 0.0;
+                self.player.target_lane = 1;
+                self.player.current_lane = 1;
             }
         }
 
         // camera update
-        // TODO: move some of 
         self.camera.latitude = cx as f32 * config::CURSOR_MOVEMENT_SCALE;
         self.camera.longitude = -cy * config::CURSOR_MOVEMENT_SCALE;
         self.camera.distance = self.camera.default_distance + zoom;
         self.camera.target = Translation3::new(
-            self.player.transform.position.x,
-            self.player.transform.position.y,
-            self.player.transform.position.z,
+            self.player.cube.transform.position.x,
+            self.player.cube.transform.position.y,
+            self.player.cube.transform.position.z,
         ).vector;
 
         // plane update
@@ -205,7 +228,10 @@ impl Light {
 
 #[derive(Copy, Clone, Debug)]
 pub struct Player {
-    transform: Transform,
+    target_lane: usize,
+    current_lane: usize,
+    lerp: f32,
+    pub cube: Cube,
 }
 
 #[derive(Copy, Clone, Debug)]
