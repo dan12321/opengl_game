@@ -1,7 +1,8 @@
 use std::sync::mpsc::Receiver;
 
+use super::config;
 use super::config::{MAX_ZOOM, MIN_ZOOM, SCROLL_ZOOM_SCALE};
-use glfw::{Action, Glfw, Key, WindowEvent};
+use glfw::{Action, Glfw, Key, WindowEvent, Window};
 
 pub struct Controller<'a> {
     direction_x: f32,
@@ -32,7 +33,7 @@ impl<'a> Controller<'a> {
         }
     }
 
-    pub fn poll_input(&mut self) {
+    pub fn poll_input(&mut self, window: &mut Window) {
         self.glfw.poll_events();
         let mut buttons = Vec::with_capacity(16);
         for (_, event) in glfw::flush_messages(&self.events) {
@@ -57,8 +58,19 @@ impl<'a> Controller<'a> {
                     self.direction_x -= 1.0;
                 }
                 WindowEvent::CursorPos(x, y) => {
-                    self.camera_x = x as f32;
-                    self.camera_y = y as f32;
+                    let x = x as f32;
+                    let y = y as f32;
+                    let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
+                    let max_cy = config::MAX_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
+                    let cy_min_clamped = if y < min_cy { min_cy } else { y };
+                    let cy_clamped = if cy_min_clamped > max_cy {
+                        max_cy
+                    } else {
+                        cy_min_clamped
+                    };
+                    self.camera_x = x;
+                    self.camera_y = cy_clamped;
+                    window.set_cursor_pos(self.camera_x as f64, self.camera_y as f64);
                 }
                 WindowEvent::Scroll(_, y) => {
                     let zoom = self.zoom - (y as f32 * SCROLL_ZOOM_SCALE);

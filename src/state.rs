@@ -1,16 +1,173 @@
-use na::Matrix4;
+use std::time::{Instant, Duration};
 
-use crate::{model::Material, light::LightUniform};
+use na::{vector, Matrix4, Rotation3, Translation3};
+
+use crate::camera::Camera;
+use crate::controller::{self, Controller};
+use crate::{light::LightUniform, model::Material};
+use crate::config::{PLANE_LENGTH, PLANE_WIDTH, self};
+use crate::physics::AABBColider;
 
 pub struct GameState {
-    cubes: [Cube; 128],
-    lights: [Light; 64],
-//    box_renderer: Renderer,
-//    light_renderer: Renderer,
-//    plane_renderer: Renderer,
-    player: Cube,
+    pub cubes: Vec<Cube>,
+    pub lights: Vec<Light>,
+    pub player: Cube,
     speed: f32,
-    plane: Plane,
+    pub plane: Plane,
+    pub camera: Camera,
+}
+
+impl GameState {
+    pub fn new() -> Self {
+        let camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
+
+        let mut cubes = Vec::with_capacity(64);
+        let positions = [(2.0, 0.0, -10.0), (-2.0, 0.0, -10.0), (0.0, 0.0, -15.0)];
+        for position in positions {
+            cubes.push(Cube {
+                transform: Transform {
+                    position: position.into(),
+                    scale: (1.0, 1.0, 1.0).into(),
+                    rotation: Matrix4::identity(),
+                },
+                material: PLAYER_MATERIAL,
+            });
+        }
+
+        let mut lights = Vec::with_capacity(64);
+        for i in 0..=4 {
+            let n = i as f32;
+            let x = ((n / 4.0) * PLANE_WIDTH - (PLANE_WIDTH / 2.0)) * 1.2;
+            let y = (-n * n + 4.0 * n) + 1.0;
+            let light1_transform = Transform {
+                position: (x, y, -10.0).into(),
+                scale: (0.5, 0.5, 0.5).into(),
+                rotation: Matrix4::identity(),
+            };
+            let light2_transform = Transform {
+                position: (x, y, -50.0).into(),
+                scale: (0.5, 0.5, 0.5).into(),
+                rotation: Matrix4::identity(),
+            };
+            let light3_transform = Transform {
+                position: (x, y, -90.0).into(),
+                scale: (0.5, 0.5, 0.5).into(),
+                rotation: Matrix4::identity(),
+            };
+            let light1 = Light {
+                transform: light1_transform,
+                diffuse: (1.0, 1.0, 1.0),
+                specular: (1.0, 1.0, 1.0),
+                strength: 50.0,
+            };
+            let light2 = Light {
+                transform: light2_transform,
+                diffuse: (1.0, 1.0, 1.0),
+                specular: (1.0, 1.0, 1.0),
+                strength: 50.0,
+            };
+            let light3 = Light {
+                transform: light3_transform,
+                diffuse: (1.0, 1.0, 1.0),
+                specular: (1.0, 1.0, 1.0),
+                strength: 50.0,
+            };
+            lights.push(light1);
+            lights.push(light2);
+            lights.push(light3);
+        }
+
+        GameState {
+            camera,
+            cubes,
+            lights,
+            player: Cube {
+                transform: Transform {
+                    position: (0.0, 0.0, 0.0).into(),
+                    scale: (1.0, 1.0, 1.0).into(),
+                    rotation: Matrix4::identity(),
+                },
+                material: PLAYER_MATERIAL,
+            },
+            speed: 1.0,
+            plane: Plane {
+                transform: Transform {
+                    position: (0.0, -0.5, 0.0).into(),
+                    scale: (PLANE_WIDTH, PLANE_LENGTH, 1.0).into(),
+                    rotation: Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous(),
+                },
+                material: PLAYER_MATERIAL,
+                offset: 0.0,
+            },
+        }
+    }
+
+    pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
+        // timing properties
+        let dt = delta_time.as_secs_f32();
+        self.speed += dt;
+        let move_speed = config::MOVE_SPEED * dt;
+        
+        // controller input
+        let (x, _) = controller.direction();
+        let (cx, cy, zoom) = controller.mouse();
+
+        // lights update
+        for light in &mut self.lights {
+            if light.transform.position.z > 50.0 {
+                light.transform.position.z = -90.0;
+            }
+            light.transform.position.z += self.speed * dt;
+        }
+
+        // cubes update
+        for cube in &mut self.cubes {
+            if cube.transform.position.z > 20.0 {
+                cube.transform.position.z = -50.0;
+            }
+            cube.transform.position.z += self.speed * dt;
+        }
+
+        // player update
+        self.player.transform.position.x += x * move_speed;
+        let movable_width = PLANE_WIDTH / 2.0 - 0.5;
+        if self.player.transform.position.x > movable_width {
+            self.player.transform.position.x = movable_width;
+        }
+        if self.player.transform.position.x < -movable_width {
+            self.player.transform.position.x = -movable_width;
+        }
+
+        // Check collisions
+        let player_collider = AABBColider {
+            position: self.player.transform.position,
+            scale: self.player.transform.scale,
+        };
+        for cube in &self.cubes {
+            let collider = AABBColider {
+                position: cube.transform.position,
+                scale: cube.transform.scale,
+            };
+            if player_collider.aabb_colided(&collider) {
+                self.speed = 1.0;
+                self.player.transform.position.x = 0.0;
+            }
+        }
+
+        // camera update
+        // TODO: move some of 
+        self.camera.latitude = cx as f32 * config::CURSOR_MOVEMENT_SCALE;
+        self.camera.longitude = -cy * config::CURSOR_MOVEMENT_SCALE;
+        self.camera.distance = self.camera.default_distance + zoom;
+        self.camera.target = Translation3::new(
+            self.player.transform.position.x,
+            self.player.transform.position.y,
+            self.player.transform.position.z,
+        ).vector;
+
+        // plane update
+        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -82,3 +239,10 @@ impl Transform {
             * na::Scale3::new(self.scale.x, self.scale.y, self.scale.z).to_homogeneous()
     }
 }
+
+pub static PLAYER_MATERIAL: Material = Material {
+    ambient: (0.5, 0.1, 0.1),
+    diffuse: (1.0, 0.7, 0.7),
+    specular: (1.0, 0.7, 0.7),
+    shininess: 128,
+};

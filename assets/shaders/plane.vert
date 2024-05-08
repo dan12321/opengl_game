@@ -19,10 +19,7 @@ void main()
     vec4 view_position = projection * view * world_position;
     gl_Position = view_position;
 
-    //vec3 norm = mat3(transpose(inverse(transformation))) * vec3(1.0, 1.0, 1.0);
-    // Math seems to be going to 0, probably a precision issue.
-    // We know the plane will be flat so hard code normal for now.
-    vec3 norm = vec3(0.0, 1.0, 0.0);
+    vec3 norm = mat3(transpose(inverse(transformation))) * vec3(1.0, 1.0, 1.0);
     Normal = norm;
 
     TexCoord = texCoord;
