@@ -15,6 +15,8 @@ pub const MAX_CAMERA_LONGITUDE: f32 = 1.2;
 pub const SCROLL_ZOOM_SCALE: f32 = 1.0 / 5.0;
 pub const MAX_ZOOM: f32 = 10.0;
 pub const MIN_ZOOM: f32 = -5.0;
+pub const BEAT_SIZE: f32 = 5.0;
+pub const COLUMN_WIDTH: f32 = 1.75;
 
 // PLANE
 pub const PLANE_WIDTH: f32 = 5.0;

@@ -5,7 +5,7 @@ use na::{vector, Matrix4, Rotation3, Translation3};
 use crate::camera::Camera;
 use crate::controller::{self, Controller};
 use crate::{light::LightUniform, model::Material};
-use crate::config::{PLANE_LENGTH, PLANE_WIDTH, self};
+use crate::config::{PLANE_LENGTH, PLANE_WIDTH, self, BEAT_SIZE, COLUMN_WIDTH};
 use crate::physics::AABBColider;
 
 pub struct GameState {
@@ -20,18 +20,53 @@ pub struct GameState {
 impl GameState {
     pub fn new() -> Self {
         let camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
+        let map = Map {
+            bpm: 100.0,
+            beats: vec![
+                (true, true, false),
+                (true, false, false),
+                (true, false, true),
+                (false, false, true),
+                (false, true, true),
+                (true, false, true),
+                (true, true, false),
+            ],
+        };
 
         let mut cubes = Vec::with_capacity(64);
-        let positions = [(1.75, 0.0, -10.0), (-1.75, 0.0, -10.0), (0.0, 0.0, -15.0)];
-        for position in positions {
-            cubes.push(Cube {
-                transform: Transform {
-                    position: position.into(),
-                    scale: (1.0, 1.0, 1.0).into(),
-                    rotation: Matrix4::identity(),
-                },
-                material: PLAYER_MATERIAL,
-            });
+        for i in 0..map.beats.len() {
+            let (l, m, r) = map.beats[i];
+            let start_dist = -(5.0 + (i as f32 * BEAT_SIZE));
+            if l {
+                cubes.push(Cube {
+                    transform: Transform {
+                        position: (-COLUMN_WIDTH, 0.0, start_dist).into(),
+                        scale: (1.0, 1.0, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    material: PLAYER_MATERIAL,
+                });
+            }
+            if m {
+                cubes.push(Cube {
+                    transform: Transform {
+                        position: (0.0, 0.0, start_dist).into(),
+                        scale: (1.0, 1.0, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    material: PLAYER_MATERIAL,
+                });
+            }
+            if r {
+                cubes.push(Cube {
+                    transform: Transform {
+                        position: (COLUMN_WIDTH, 0.0, start_dist).into(),
+                        scale: (1.0, 1.0, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    material: PLAYER_MATERIAL,
+                });
+            }
         }
 
         let mut lights = Vec::with_capacity(64);
@@ -58,19 +93,19 @@ impl GameState {
                 transform: light1_transform,
                 diffuse: (1.0, 1.0, 1.0),
                 specular: (1.0, 1.0, 1.0),
-                strength: 50.0,
+                strength: 10.0,
             };
             let light2 = Light {
                 transform: light2_transform,
                 diffuse: (1.0, 1.0, 1.0),
                 specular: (1.0, 1.0, 1.0),
-                strength: 50.0,
+                strength: 10.0,
             };
             let light3 = Light {
                 transform: light3_transform,
                 diffuse: (1.0, 1.0, 1.0),
                 specular: (1.0, 1.0, 1.0),
-                strength: 50.0,
+                strength: 10.0,
             };
             lights.push(light1);
             lights.push(light2);
@@ -94,7 +129,7 @@ impl GameState {
                     material: PLAYER_MATERIAL,
                 },
             },
-            speed: 1.0,
+            speed: BEAT_SIZE * map.bpm / 60.0,
             plane: Plane {
                 transform: Transform {
                     position: (0.0, -0.5, 0.0).into(),
@@ -110,7 +145,6 @@ impl GameState {
     pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
         // timing properties
         let dt = delta_time.as_secs_f32();
-        self.speed += dt;
         let displacement = config::MOVE_SPEED * dt;
         
         // controller input
@@ -171,7 +205,6 @@ impl GameState {
                 scale: cube.transform.scale,
             };
             if player_collider.aabb_colided(&collider) {
-                self.speed = 1.0;
                 self.player.cube.transform.position.x = 0.0;
                 self.player.target_lane = 1;
                 self.player.current_lane = 1;
@@ -266,9 +299,14 @@ impl Transform {
     }
 }
 
+struct Map {
+    bpm: f32,
+    beats: Vec<(bool, bool, bool)>,
+}
+
 pub static PLAYER_MATERIAL: Material = Material {
-    ambient: (0.5, 0.1, 0.1),
-    diffuse: (1.0, 0.7, 0.7),
-    specular: (1.0, 0.7, 0.7),
-    shininess: 128,
+    ambient: (0.3, 0.3, 0.3),
+    diffuse: (0.6, 0.7, 0.9),
+    specular: (0.7, 0.7, 0.7),
+    shininess: 8,
 };
