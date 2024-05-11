@@ -15,13 +15,14 @@ pub struct GameState {
     speed: f32,
     pub plane: Plane,
     pub camera: Camera,
+    map: Map,
 }
 
 impl GameState {
     pub fn new() -> Self {
         let camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
         let map = Map {
-            bpm: 100.0,
+            bpm: 134.0,
             beats: vec![
                 (true, true, false),
                 (true, false, false),
@@ -30,45 +31,172 @@ impl GameState {
                 (false, true, true),
                 (true, false, true),
                 (true, true, false),
+                (true, false, true),
+                (false, false, false),
+                (false, false, false),
+                (true, false, true),
+                (true, false, true),
+                (true, true, false),
+                (true, false, true),
+                (false, true, true),
+                (false, true, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (false, false, false),
+                (false, false, false),
+                (true, true, false),
+                (true, false, false),
+                (true, false, true),
+                (false, false, true),
+                (false, true, true),
+                (true, false, true),
+                (true, true, false),
+                (true, false, true),
+                (false, false, false),
+                (false, false, false),
+                (true, false, true),
+                (true, false, true),
+                (true, true, false),
+                (true, false, true),
+                (false, true, true),
+                (false, true, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (false, false, false),
+                (false, false, false),
             ],
         };
 
-        let mut cubes = Vec::with_capacity(64);
-        for i in 0..map.beats.len() {
-            let (l, m, r) = map.beats[i];
-            let start_dist = -(5.0 + (i as f32 * BEAT_SIZE));
-            if l {
-                cubes.push(Cube {
+        let cubes = Self::starting_cubes(&map);
+        let lights = Self::starting_lights();
+
+        GameState {
+            camera,
+            cubes,
+            lights,
+            player: Player {
+                target_lane: 1,
+                current_lane: 1,
+                lerp: 1.0,
+                cube: Cube {
                     transform: Transform {
-                        position: (-COLUMN_WIDTH, 0.0, start_dist).into(),
+                        position: (0.0, 0.0, 0.0).into(),
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
                     material: PLAYER_MATERIAL,
-                });
+                },
+            },
+            speed: BEAT_SIZE * map.bpm / 60.0,
+            plane: Plane {
+                transform: Transform {
+                    position: (0.0, -0.5, 0.0).into(),
+                    scale: (PLANE_WIDTH, PLANE_LENGTH, 1.0).into(),
+                    rotation: Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous(),
+                },
+                material: PLAYER_MATERIAL,
+                offset: 0.0,
+            },
+            map,
+        }
+    }
+
+    pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
+        // timing properties
+        let dt = delta_time.as_secs_f32();
+        let displacement = config::MOVE_SPEED * dt;
+        
+        // controller input
+        let x = controller.direction();
+        let (cx, cy, zoom) = controller.mouse();
+
+        // lights update
+        for light in &mut self.lights {
+            if light.transform.position.z > 50.0 {
+                light.transform.position.z = -90.0;
             }
-            if m {
-                cubes.push(Cube {
-                    transform: Transform {
-                        position: (0.0, 0.0, start_dist).into(),
-                        scale: (1.0, 1.0, 1.0).into(),
-                        rotation: Matrix4::identity(),
-                    },
-                    material: PLAYER_MATERIAL,
-                });
+            light.transform.position.z += self.speed * dt;
+        }
+
+        // cubes update
+        for cube in &mut self.cubes {
+            cube.transform.position.z += self.speed * dt;
+        }
+
+        // player update
+        if self.player.lerp > 0.999 {
+            // TODO add some leaway so a double tap moves two lanes
+            if x > 0.0 && self.player.target_lane < 2 {
+                self.player.current_lane = self.player.target_lane;
+                self.player.target_lane += 1;
+                self.player.lerp = 1.0 - self.player.lerp;
+            } else if x < 0.0 && self.player.target_lane > 0 {
+                self.player.current_lane = self.player.target_lane;
+                self.player.target_lane -= 1;
+                self.player.lerp = 1.0 - self.player.lerp;
             }
-            if r {
-                cubes.push(Cube {
-                    transform: Transform {
-                        position: (COLUMN_WIDTH, 0.0, start_dist).into(),
-                        scale: (1.0, 1.0, 1.0).into(),
-                        rotation: Matrix4::identity(),
-                    },
-                    material: PLAYER_MATERIAL,
-                });
+        } else if self.player.lerp < 1.0 {
+            self.player.lerp += displacement;
+        }
+        let start = (self.player.current_lane as f32 - 1.0) * 1.75;
+        let end = (self.player.target_lane as f32 - 1.0) * 1.75;
+        self.player.cube.transform.position.x =
+            end * self.player.lerp + start * (1.0 - self.player.lerp);
+        let movable_width = PLANE_WIDTH / 2.0 - 0.5;
+        if self.player.cube.transform.position.x > movable_width {
+            self.player.cube.transform.position.x = movable_width;
+        }
+        if self.player.cube.transform.position.x < -movable_width {
+            self.player.cube.transform.position.x = -movable_width;
+        }
+
+        // Check collisions
+        let player_collider = AABBColider {
+            position: self.player.cube.transform.position,
+            scale: self.player.cube.transform.scale,
+        };
+        for cube in &self.cubes {
+            let collider = AABBColider {
+                position: cube.transform.position,
+                scale: cube.transform.scale,
+            };
+            if player_collider.aabb_colided(&collider) {
+                self.reset();
+                break;
             }
         }
 
+        // camera update
+        self.camera.latitude = cx as f32 * config::CURSOR_MOVEMENT_SCALE;
+        self.camera.longitude = -cy * config::CURSOR_MOVEMENT_SCALE;
+        self.camera.distance = self.camera.default_distance + zoom;
+        self.camera.target = Translation3::new(
+            self.player.cube.transform.position.x,
+            self.player.cube.transform.position.y,
+            self.player.cube.transform.position.z,
+        ).vector;
+
+        // plane update
+        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+    }
+
+    fn reset(&mut self) {
+        self.lights = Self::starting_lights();
+        self.cubes = Self::starting_cubes(&self.map);
+        self.player.cube.transform.position.x = 0.0;
+        self.player.target_lane = 1;
+        self.player.current_lane = 1;
+    }
+
+    fn starting_lights() -> Vec<Light> {
         let mut lights = Vec::with_capacity(64);
         for i in 0..=4 {
             let n = i as f32;
@@ -112,117 +240,46 @@ impl GameState {
             lights.push(light3);
         }
 
-        GameState {
-            camera,
-            cubes,
-            lights,
-            player: Player {
-                target_lane: 1,
-                current_lane: 1,
-                lerp: 1.0,
-                cube: Cube {
+        lights
+    }
+
+    fn starting_cubes(map: &Map) -> Vec<Cube> {
+        let mut cubes = Vec::with_capacity(64);
+        for i in 0..map.beats.len() {
+            let (l, m, r) = map.beats[i];
+            let start_dist = -(5.0 + i as f32) * BEAT_SIZE;
+            if l {
+                cubes.push(Cube {
                     transform: Transform {
-                        position: (0.0, 0.0, 0.0).into(),
+                        position: (-COLUMN_WIDTH, 0.0, start_dist).into(),
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
                     material: PLAYER_MATERIAL,
-                },
-            },
-            speed: BEAT_SIZE * map.bpm / 60.0,
-            plane: Plane {
-                transform: Transform {
-                    position: (0.0, -0.5, 0.0).into(),
-                    scale: (PLANE_WIDTH, PLANE_LENGTH, 1.0).into(),
-                    rotation: Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous(),
-                },
-                material: PLAYER_MATERIAL,
-                offset: 0.0,
-            },
-        }
-    }
-
-    pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
-        // timing properties
-        let dt = delta_time.as_secs_f32();
-        let displacement = config::MOVE_SPEED * dt;
-        
-        // controller input
-        let x = controller.direction();
-        let (cx, cy, zoom) = controller.mouse();
-
-        // lights update
-        for light in &mut self.lights {
-            if light.transform.position.z > 50.0 {
-                light.transform.position.z = -90.0;
+                });
             }
-            light.transform.position.z += self.speed * dt;
-        }
-
-        // cubes update
-        for cube in &mut self.cubes {
-            if cube.transform.position.z > 20.0 {
-                cube.transform.position.z = -50.0;
+            if m {
+                cubes.push(Cube {
+                    transform: Transform {
+                        position: (0.0, 0.0, start_dist).into(),
+                        scale: (1.0, 1.0, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    material: PLAYER_MATERIAL,
+                });
             }
-            cube.transform.position.z += self.speed * dt;
-        }
-
-        // player update
-        if self.player.lerp > 0.999 {
-            // TODO add some leaway so a double tap moves two lanes
-            if x > 0.0 && self.player.target_lane < 2 {
-                self.player.current_lane = self.player.target_lane;
-                self.player.target_lane += 1;
-                self.player.lerp = 1.0 - self.player.lerp;
-            } else if x < 0.0 && self.player.target_lane > 0 {
-                self.player.current_lane = self.player.target_lane;
-                self.player.target_lane -= 1;
-                self.player.lerp = 1.0 - self.player.lerp;
-            }
-        } else if self.player.lerp < 1.0 {
-            self.player.lerp += displacement;
-        }
-        let start = (self.player.current_lane as f32 - 1.0) * 1.75;
-        let end = (self.player.target_lane as f32 - 1.0) * 1.75;
-        self.player.cube.transform.position.x =
-            end * self.player.lerp + start * (1.0 - self.player.lerp);
-        let movable_width = PLANE_WIDTH / 2.0 - 0.5;
-        if self.player.cube.transform.position.x > movable_width {
-            self.player.cube.transform.position.x = movable_width;
-        }
-        if self.player.cube.transform.position.x < -movable_width {
-            self.player.cube.transform.position.x = -movable_width;
-        }
-
-        // Check collisions
-        let player_collider = AABBColider {
-            position: self.player.cube.transform.position,
-            scale: self.player.cube.transform.scale,
-        };
-        for cube in &self.cubes {
-            let collider = AABBColider {
-                position: cube.transform.position,
-                scale: cube.transform.scale,
-            };
-            if player_collider.aabb_colided(&collider) {
-                self.player.cube.transform.position.x = 0.0;
-                self.player.target_lane = 1;
-                self.player.current_lane = 1;
+            if r {
+                cubes.push(Cube {
+                    transform: Transform {
+                        position: (COLUMN_WIDTH, 0.0, start_dist).into(),
+                        scale: (1.0, 1.0, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    material: PLAYER_MATERIAL,
+                });
             }
         }
-
-        // camera update
-        self.camera.latitude = cx as f32 * config::CURSOR_MOVEMENT_SCALE;
-        self.camera.longitude = -cy * config::CURSOR_MOVEMENT_SCALE;
-        self.camera.distance = self.camera.default_distance + zoom;
-        self.camera.target = Translation3::new(
-            self.player.cube.transform.position.x,
-            self.player.cube.transform.position.y,
-            self.player.cube.transform.position.z,
-        ).vector;
-
-        // plane update
-        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+        cubes
     }
 }
 
