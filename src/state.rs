@@ -20,7 +20,7 @@ pub struct GameState {
 
 impl GameState {
     pub fn new() -> Self {
-        let camera = Camera::new(10.0, 0.0, -0.5, vector![0.0, 0.0, 0.0]);
+        let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
         let map = Map {
             bpm: 134.0,
             beats: vec![
@@ -173,16 +173,6 @@ impl GameState {
                 break;
             }
         }
-
-        // camera update
-        self.camera.latitude = cx as f32 * config::CURSOR_MOVEMENT_SCALE;
-        self.camera.longitude = -cy * config::CURSOR_MOVEMENT_SCALE;
-        self.camera.distance = self.camera.default_distance + zoom;
-        self.camera.target = Translation3::new(
-            self.player.cube.transform.position.x,
-            self.player.cube.transform.position.y,
-            self.player.cube.transform.position.z,
-        ).vector;
 
         // plane update
         self.plane.offset -= self.speed * dt / PLANE_LENGTH;
