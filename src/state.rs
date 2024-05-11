@@ -1,12 +1,12 @@
-use std::time::{Instant, Duration};
+use std::time::Duration;
 
-use na::{vector, Matrix4, Rotation3, Translation3};
+use na::{vector, Matrix4, Rotation3};
 
 use crate::camera::Camera;
-use crate::controller::{self, Controller};
-use crate::{light::LightUniform, model::Material};
-use crate::config::{PLANE_LENGTH, PLANE_WIDTH, self, BEAT_SIZE, COLUMN_WIDTH};
+use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
+use crate::controller::Controller;
 use crate::physics::AABBColider;
+use crate::{light::LightUniform, model::Material};
 
 pub struct GameState {
     pub cubes: Vec<Cube>,
@@ -113,7 +113,7 @@ impl GameState {
         // timing properties
         let dt = delta_time.as_secs_f32();
         let displacement = config::MOVE_SPEED * dt;
-        
+
         // controller input
         let x = controller.direction();
 

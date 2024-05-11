@@ -2,8 +2,8 @@ mod cube_renderer;
 mod plane_renderer;
 mod spot_light_renderer;
 
-use std::path::PathBuf;
 use std::f32::consts::PI;
+use std::path::PathBuf;
 
 use cube_renderer::CubeRenderer;
 use gl;
@@ -16,20 +16,12 @@ use crate::light::LightUniform;
 use crate::state::GameState;
 
 use super::config::{
-    CUBE_VERT_SHADER,
-    LIGHT_FRAG_SHADER,
-    LIGHT_VERT_SHADER,
-    PLANE_VERT_SHADER,
-    TEXTURE_FRAG_SHADER,
+    CUBE_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, PLANE_VERT_SHADER, TEXTURE_FRAG_SHADER,
     WALL_TEXTURE,
 };
 use super::shape::{
-    CUBE_INDICES,
-    CUBE_VERTICES,
-    TEXTURED_CUBE_INDICES,
+    CUBE_INDICES, CUBE_VERTICES, QUAD_INDICES, QUAD_VERTICES, TEXTURED_CUBE_INDICES,
     TEXTURED_CUBE_VERTICES,
-    QUAD_INDICES,
-    QUAD_VERTICES,
 };
 
 pub struct Renderer {
@@ -77,7 +69,8 @@ impl Renderer {
             &QUAD_VERTICES,
             &QUAD_INDICES,
             texture,
-        ).unwrap();
+        )
+        .unwrap();
 
         Self {
             light,
@@ -90,11 +83,11 @@ impl Renderer {
     pub fn render(&self, state: &GameState) {
         clear();
         let view = state.camera.transform();
-        let light_uniforms: Vec<LightUniform> = state.lights.iter()
-            .map(|l| l.as_light_uniforms())
-            .collect();
+        let light_uniforms: Vec<LightUniform> =
+            state.lights.iter().map(|l| l.as_light_uniforms()).collect();
         //light_uniforms.push(l.as_light_uniforms());
-        self.light.draw(&state.lights, view, self.projection.as_matrix().clone());
+        self.light
+            .draw(&state.lights, view, self.projection.as_matrix().clone());
         self.cube.draw(
             &state.cubes,
             &light_uniforms,

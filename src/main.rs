@@ -3,11 +3,11 @@ mod config;
 mod controller;
 mod light;
 mod model;
+mod physics;
 mod render;
 mod shader;
 mod shape;
 mod state;
-mod physics;
 
 extern crate glfw;
 extern crate image;
@@ -16,21 +16,12 @@ extern crate tracing;
 extern crate tracing_subscriber;
 
 use std::time::Instant;
-use std::{f32::consts::PI, path::PathBuf};
 
-use camera::Camera;
 use controller::{Button, Controller};
-use gl::types::*;
 use glfw::Context;
-use light::LightUniform;
-use model::Material;
-use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
-use physics::AABBColider;
-use rand::Rng;
 use render::Renderer;
-use shape::{CUBE_INDICES, CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES, QUAD_VERTICES, QUAD_INDICES};
-use state::{Cube, Light, Transform, Plane, GameState};
-use tracing::{Level, debug};
+use state::GameState;
+use tracing::Level;
 
 fn main() {
     // Log setup
@@ -97,4 +88,3 @@ fn main() {
         renderer.render(&state);
     }
 }
-
