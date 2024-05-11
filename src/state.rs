@@ -116,7 +116,6 @@ impl GameState {
         
         // controller input
         let x = controller.direction();
-        let (cx, cy, zoom) = controller.mouse();
 
         // lights update
         for light in &mut self.lights {

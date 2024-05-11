@@ -27,9 +27,7 @@ use model::Material;
 use na::{vector, Matrix4, Perspective3, Rotation3, Translation3};
 use physics::AABBColider;
 use rand::Rng;
-use render::cube_renderer::CubeRenderer;
-use render::plane_renderer::PlaneRenderer;
-use render::spot_light_renderer::SpotLightRenderer;
+use render::Renderer;
 use shape::{CUBE_INDICES, CUBE_VERTICES, TEXTURED_CUBE_INDICES, TEXTURED_CUBE_VERTICES, QUAD_VERTICES, QUAD_INDICES};
 use state::{Cube, Light, Transform, Plane, GameState};
 use tracing::{Level, debug};
@@ -76,46 +74,9 @@ fn main() {
     }
 
     // Program Setup
-    let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
-    let fovy: GLfloat = PI / 2.0;
-    let znear: GLfloat = 0.1;
-    let zfar: GLfloat = 100.0;
-    let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
-
-    let light_vert_shader = PathBuf::from(config::LIGHT_VERT_SHADER);
-    let light_frag_shader = PathBuf::from(config::LIGHT_FRAG_SHADER);
-    let light_renderer = SpotLightRenderer::new(
-        &light_vert_shader,
-        &light_frag_shader,
-        &CUBE_VERTICES,
-        &CUBE_INDICES,
-    )
-    .unwrap();
-
-    let cube_vert_shader = PathBuf::from(config::CUBE_VERT_SHADER);
-    let texture_frag_shader = PathBuf::from(config::TEXTURE_FRAG_SHADER);
-    let texture = image::open(config::WALL_TEXTURE).unwrap();
-    let cube_renderer = CubeRenderer::new(
-        &cube_vert_shader,
-        &texture_frag_shader,
-        &TEXTURED_CUBE_VERTICES,
-        &TEXTURED_CUBE_INDICES,
-        texture,
-    )
-    .unwrap();
-
-    let plane_vert_shader = PathBuf::from(config::PLANE_VERT_SHADER);
-    let texture = image::open(config::WALL_TEXTURE).unwrap();
-    let plane_renderer = PlaneRenderer::new(
-        &plane_vert_shader,
-        &texture_frag_shader,
-        &QUAD_VERTICES,
-        &QUAD_INDICES,
-        texture,
-    ).unwrap();
-
     let mut state = GameState::new();
     let mut controller = Controller::new(&mut glfw, events);
+    let renderer = Renderer::new(window_width, window_height);
 
     let mut last_time = Instant::now();
     while !window.should_close() {
@@ -133,43 +94,7 @@ fn main() {
         }
 
         state.update(delta_time, &controller);
-        
-        // render
-        clear();
-        let view = state.camera.transform();
-        let light_uniforms: Vec<LightUniform> = state.lights.iter()
-            .map(|l| l.as_light_uniforms())
-            .collect();
-        //light_uniforms.push(l.as_light_uniforms());
-        light_renderer.draw(&state.lights, view, projection.as_matrix().clone());
-        cube_renderer.draw(
-            &state.cubes,
-            &light_uniforms,
-            &state.camera.position().into(),
-            view,
-            projection.as_matrix().clone(),
-        );
-        cube_renderer.draw(
-            &[state.player.cube],
-            &light_uniforms,
-            &state.camera.position().into(),
-            view,
-            projection.as_matrix().clone(),
-        );
-
-        plane_renderer.draw(
-            &[state.plane],
-            &light_uniforms,
-            &state.camera.position().into(),
-            view,
-            projection.as_matrix().clone(),
-        );
+        renderer.render(&state);
     }
 }
 
-fn clear() {
-    unsafe {
-        gl::ClearColor(0.0, 0.0, 0.0, 1.0);
-        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-    }
-}
