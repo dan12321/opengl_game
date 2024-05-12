@@ -85,7 +85,6 @@ impl Renderer {
         let view = state.camera.transform();
         let light_uniforms: Vec<LightUniform> =
             state.lights.iter().map(|l| l.as_light_uniforms()).collect();
-        //light_uniforms.push(l.as_light_uniforms());
         self.light
             .draw(&state.lights, view, self.projection.as_matrix().clone());
         self.cube.draw(
