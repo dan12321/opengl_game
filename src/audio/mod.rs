@@ -91,12 +91,10 @@ impl AudioThread {
         let mut next_value = move || {
             if receiver.try_recv().unwrap_or(last) == 1 {
                 last = 1;
-                debug!("audio");
                 sample_clock = (sample_clock + 1.0) % sample_rate;
                 (sample_clock * 440.0 * 2.0 * PI / sample_rate).sin()
             } else {
                 last = 0;
-                debug!("no audio");
                 0.0
             }
         };
