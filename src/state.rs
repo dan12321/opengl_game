@@ -16,6 +16,7 @@ pub struct GameState {
     pub plane: Plane,
     pub camera: Camera,
     map: Map,
+    pub collided: bool,
 }
 
 impl GameState {
@@ -106,6 +107,7 @@ impl GameState {
                 offset: 0.0,
             },
             map,
+            collided: false,
         }
     }
 
@@ -113,6 +115,7 @@ impl GameState {
         // timing properties
         let dt = delta_time.as_secs_f32();
         let displacement = config::MOVE_SPEED * dt;
+        self.collided = false;
 
         // controller input
         let x = controller.direction();
@@ -169,6 +172,7 @@ impl GameState {
             };
             if player_collider.aabb_colided(&collider) {
                 self.reset();
+                self.collided = true;
                 break;
             }
         }

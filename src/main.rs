@@ -8,6 +8,7 @@ mod render;
 mod shader;
 mod shape;
 mod state;
+mod audio;
 
 extern crate glfw;
 extern crate image;
@@ -17,6 +18,7 @@ extern crate tracing_subscriber;
 
 use std::time::Instant;
 
+use audio::{Audio, AudioThread};
 use controller::{Button, Controller};
 use glfw::Context;
 use render::Renderer;
@@ -68,6 +70,7 @@ fn main() {
     let mut state = GameState::new();
     let mut controller = Controller::new(&mut glfw, events);
     let renderer = Renderer::new(window_width, window_height);
+    let audio = Audio::new();
 
     let mut last_time = Instant::now();
     while !window.should_close() {
@@ -85,6 +88,9 @@ fn main() {
         }
 
         state.update(delta_time, &controller);
+        if state.collided {
+            audio.collision_effect();
+        }
         renderer.render(&state);
     }
 }
