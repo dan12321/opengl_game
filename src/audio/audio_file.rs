@@ -53,17 +53,8 @@ impl Wav {
             file_header = format!("{:?}", file_header),
             "open wav file",
         );
-        let samples = parse_samples(&sample_buffer);
-        let mut example = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .open("samples")
-            .unwrap();
-        let s: Vec<String> = samples.iter()
-            .map(|s| s.to_string())
-            .collect();
-        example.write_all(s.join("\n").as_bytes()).unwrap();
         // assume 1 chanel for now
+        let samples = parse_samples(&sample_buffer);
         Wav {
             samples,
         }

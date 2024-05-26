@@ -7,7 +7,6 @@
   - [X] [cpal](https://github.com/RustAudio/cpal) low level cross platform
     - Can build output stream react to inputs?
     - Likely need an audio thread running that receives messages
-  - [ ] Current handling is Naive, uses a lot of memory and causes a slow startup
 - [ ] Misc
   - [ ] Add menus
   - [ ] Add scenes
