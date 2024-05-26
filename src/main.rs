@@ -89,7 +89,7 @@ fn main() {
 
         state.update(delta_time, &controller);
         if state.collided {
-            audio.collision_effect();
+            audio.collided();
         }
         renderer.render(&state);
     }

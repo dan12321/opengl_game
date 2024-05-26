@@ -22,12 +22,13 @@ pub struct Audio {
 
 impl Audio {
     pub fn new() -> Self {
-        let wav = audio_file::Wav::new("assets/sounds/test.wav".into());
+        let death_wav = audio_file::Wav::new("assets/sounds/test.wav".into());
+        let music_wav = audio_file::Wav::new("assets/sounds/GameSongMono.wav".into());
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
 
         let child = thread::spawn(move || {
-            let audio_thread = Mixer::new(receiver, wav);
+            let audio_thread = Mixer::new(receiver, vec![music_wav, death_wav]);
             audio_thread.run();
         });
         Audio {
@@ -40,11 +41,15 @@ impl Audio {
         self.sender.send(1).unwrap();
         self.sender.send(0).unwrap();
     }
+
+    pub fn collided(&self) {
+        self.sender.send(2).unwrap();
+    }
 }
 
 impl Drop for Audio {
     fn drop(&mut self) {
-        self.sender.send(2).unwrap();
+        self.sender.send(3).unwrap();
     }
 }
 
@@ -52,11 +57,11 @@ struct Mixer {
     device: Device,
     config: SupportedStreamConfig,
     receiver: Receiver<i32>,
-    wav: Wav,
+    wavs: Vec<Wav>,
 }
 
 impl Mixer {
-    fn new(receiver: Receiver<i32>, wav: Wav) -> Self {
+    fn new(receiver: Receiver<i32>, wavs: Vec<Wav>) -> Self {
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         let device_name = device.name().unwrap();
@@ -68,7 +73,7 @@ impl Mixer {
             device,
             config: config.into(),
             receiver,
-            wav,
+            wavs,
         }
     }
 
@@ -101,26 +106,40 @@ impl Mixer {
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
         let mut last = 0;
-        let mut wav_position = 0;
-        let wav = self.wav.samples.clone();
-        debug!(wav = format!("{:?}", &wav[0..32]), "play");
+        let mut death_wav_position = 0;
+        let mut music_wav_position = 0;
+        let death_wav = self.wavs[1].samples.clone();
+        let music_wav = self.wavs[0].samples.clone();
+        debug!(wav = format!("{:?}", &death_wav[0..32]), "play");
         let mut next_value = move || {
-            if receiver.try_recv().unwrap_or(last) == 1 {
+            let mut result = 0.0;
+            last = receiver.try_recv().unwrap_or(last);
+            if last == 2 {
+                music_wav_position = 0;
                 last = 1;
-                let sample = wav[wav_position];
-                wav_position += 1;
-                if wav_position >= wav.len() {
+            }
+
+            if last != 0 {
+                let sample = death_wav[death_wav_position];
+                death_wav_position += 1;
+                if death_wav_position >= death_wav.len() {
                     last = 0;
-                    wav_position = 0;
+                    death_wav_position = 0;
                 }
-                sample / 32_768.0
+                result += sample / 32_768.0
                 //sample_clock = (sample_clock + 1.0) % sample_rate;
                 //(sample_clock * 440.0 * 2.0 * PI / sample_rate).sin()
             } else {
                 last = 0;
-                wav_position = 0;
-                0.0
+                death_wav_position = 0;
+                result += 0.0
             }
+
+            let music_sample = music_wav[music_wav_position % music_wav.len()];
+            music_wav_position += 1;
+            result += music_sample / 32_768.0;
+
+            result
         };
     
         let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
@@ -137,12 +156,13 @@ impl Mixer {
         stream.play().unwrap();
     
         let mut last_message = self.receiver.recv().unwrap();
-        while last_message != 2 {
+        while last_message != 3 {
             debug!(last_message = last_message, "last audio message");
             if last_message == 1 {
                 sender.send(1).unwrap();
-                thread::sleep(Duration::from_secs(2));
-                sender.send(0).unwrap();
+            }
+            if last_message == 2 {
+                sender.send(2).unwrap();
             }
             last_message = self.receiver.recv().unwrap();
         }

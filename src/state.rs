@@ -23,13 +23,17 @@ impl GameState {
     pub fn new() -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
         let map = Map {
-            bpm: 134.0,
+            bpm: 140.0,
             beats: vec![
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
                 (true, true, false),
-                (true, false, false),
                 (true, false, true),
-                (false, false, true),
                 (false, true, true),
+                (true, false, true),
+                (true, false, true),
                 (true, false, true),
                 (true, true, false),
                 (true, false, true),
