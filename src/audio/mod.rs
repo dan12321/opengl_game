@@ -4,6 +4,7 @@ use std::thread;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 
+use cpal::SampleRate;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Sample, SizedSample, StreamConfig, SupportedStreamConfig
 };
@@ -18,13 +19,30 @@ pub struct Audio {
 
 impl Audio {
     pub fn new() -> Self {
-        let death_wav = audio_file::Wav::new("assets/sounds/test.wav".into());
-        let music_wav = audio_file::Wav::new("assets/sounds/GameSongMono.wav".into());
+        let wav_files = ["assets/sounds/GameSongMono.wav", "assets/sounds/test.wav"];
+        let host = cpal::default_host();
+        let device = host.default_output_device().unwrap();
+        let device_name = device.name().unwrap();
+
+        let supported_config: Vec<_> = device.supported_output_configs().unwrap().into_iter().collect();
+        let config = device.default_output_config().unwrap();
+        debug!(device = device_name, configs = format!("{:?}", &supported_config), config = format!("{:?}", &config), "Output device");
+
+        let mut wavs: Vec<Wav> = Vec::with_capacity(wav_files.len());
+        for wav_file in wav_files {
+            let wav = audio_file::Wav::new(wav_file.into());
+            wavs.push(wav);
+        }
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
 
         thread::spawn(move || {
-            let audio_thread = Mixer::new(receiver, vec![music_wav, death_wav]);
+            let audio_thread = Mixer::new(
+                receiver,
+                wavs,
+            device,
+            config.into(),
+        );
             audio_thread.run();
         });
         Audio {
@@ -51,17 +69,10 @@ struct Mixer {
 }
 
 impl Mixer {
-    fn new(receiver: Receiver<i32>, wavs: Vec<Wav>) -> Self {
-        let host = cpal::default_host();
-        let device = host.default_output_device().unwrap();
-        let device_name = device.name().unwrap();
-
-        let config = device.default_output_config().unwrap();
-        debug!(device = device_name, config = format!("{:?}", &config), "Output device");
-    
+    fn new(receiver: Receiver<i32>, wavs: Vec<Wav>, device: Device, config: SupportedStreamConfig) -> Self {
         Mixer {
             device,
-            config: config.into(),
+            config,
             receiver,
             wavs,
         }
@@ -88,7 +99,8 @@ impl Mixer {
         T: SizedSample + FromSample<f32>,
     {
         let config: StreamConfig = self.config.config();
-        // let sample_rate = config.sample_rate.0 as f32;
+        let sample_rate = config.sample_rate.0 as f32;
+        let seconds_per_sample = 1.0 / sample_rate;
         let channels = config.channels as usize;
     
         // Produce a sinusoid of maximum amplitude.
@@ -97,15 +109,17 @@ impl Mixer {
         sender.send(0).unwrap();
         let mut last = 0;
         let mut death_wav_position = 0;
-        let mut music_wav_position = 0;
+        let mut music_wav_second = 0.0;
         let death_wav = self.wavs[1].samples.clone();
         let music_wav = self.wavs[0].samples.clone();
+        let music_sample_rate = self.wavs[0].sample_rate;
+        let music_seconds_per_sample = 1.0 / music_sample_rate as f32;
         debug!(wav = format!("{:?}", &death_wav[0..32]), "play");
         let mut next_value = move || {
             let mut result = 0.0;
             last = receiver.try_recv().unwrap_or(last);
             if last == 2 {
-                music_wav_position = 0;
+                music_wav_second = 0.0;
                 last = 1;
             }
 
@@ -125,8 +139,15 @@ impl Mixer {
                 result += 0.0
             }
 
-            let music_sample = music_wav[music_wav_position % music_wav.len()];
-            music_wav_position += 1;
+            let raw_index = music_wav_second / music_seconds_per_sample;
+            let limit = music_wav.len();
+            let lower_index = raw_index.floor();
+            let upper_index = raw_index.ceil();
+            let dist_to_lower = raw_index - lower_index;
+            let lower = music_wav[lower_index as usize % limit];
+            let upper = music_wav[upper_index as usize % limit];
+            let music_sample = upper * dist_to_lower + lower * (1.0 - dist_to_lower);
+            music_wav_second += seconds_per_sample;
             result += music_sample / 32_768.0;
 
             result

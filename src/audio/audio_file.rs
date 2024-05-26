@@ -5,6 +5,7 @@ use tracing::debug;
 #[derive(Clone, Debug)]
 pub struct Wav {
     pub samples: Vec<f32>,
+    pub sample_rate: u32,
 }
 
 impl Wav {
@@ -37,7 +38,8 @@ impl Wav {
 
         let mut sample_buffer: Vec<u8> = Vec::with_capacity(data_size as usize);
         unsafe { sample_buffer.set_len(data_size as usize); }
-        let num = file.read(&mut sample_buffer).unwrap();        debug!(
+        let num = file.read(&mut sample_buffer).unwrap();
+        debug!(
             correct_subtype = correct_subtype,
             correct_filetype = correct_filetype,
             filesize = filesize,
@@ -48,7 +50,7 @@ impl Wav {
             bits_per_sample = bits_per_sample,
             data_size = data_size,
             data_read = num,
-            audio_bytes = format!("{:?}", &sample_buffer[0..44]),
+            audio_bytes = format!("{:?}", &sample_buffer[0..200]),
             fsb = format!("{:?}", filesize_bytes),
             file_header = format!("{:?}", file_header),
             "open wav file",
@@ -57,6 +59,7 @@ impl Wav {
         let samples = parse_samples(&sample_buffer);
         Wav {
             samples,
+            sample_rate,
         }
     }
 }

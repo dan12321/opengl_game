@@ -24,59 +24,55 @@ impl GameState {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
         let map = Map {
             bpm: 140.0,
+            subdivisions: 2.0,
             beats: vec![
                 (false, false, false),
                 (false, false, false),
                 (false, false, false),
                 (false, false, false),
-                (true, true, false),
-                (true, false, true),
-                (false, true, true),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
-                (true, true, false),
-                (true, false, true),
                 (false, false, false),
                 (false, false, false),
-                (true, false, true),
-                (true, false, true),
-                (true, true, false),
-                (true, false, true),
-                (false, true, true),
-                (false, true, true),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
                 (false, false, false),
                 (false, false, false),
                 (true, true, false),
-                (true, false, false),
-                (true, false, true),
-                (false, false, true),
-                (false, true, true),
-                (true, false, true),
                 (true, true, false),
                 (true, false, true),
-                (false, false, false),
-                (false, false, false),
-                (true, false, true),
-                (true, false, true),
-                (true, true, false),
                 (true, false, true),
                 (false, true, true),
                 (false, true, true),
                 (true, false, true),
                 (true, false, true),
                 (true, false, true),
+                (false, true, false),
+                (false, true, false),
+                (false, true, false),
                 (true, false, true),
                 (true, false, true),
+                (true, true, false),
+                (true, true, false),
+                (true, true, false),
+                (true, false, true),
+                (true, false, true),
+                (true, false, true),
+                (false, true, true),
+                (false, true, true),
                 (true, false, true),
                 (false, false, false),
                 (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (false, false, false),
+                (true, false, true),
             ],
         };
 
@@ -100,7 +96,7 @@ impl GameState {
                     material: PLAYER_MATERIAL,
                 },
             },
-            speed: BEAT_SIZE * map.bpm / 60.0,
+            speed: BEAT_SIZE * (map.bpm / 60.0) * map.subdivisions,
             plane: Plane {
                 transform: Transform {
                     position: (0.0, -0.5, 0.0).into(),
@@ -244,11 +240,12 @@ impl GameState {
         let mut cubes = Vec::with_capacity(64);
         for i in 0..map.beats.len() {
             let (l, m, r) = map.beats[i];
-            let start_dist = -(5.0 + i as f32) * BEAT_SIZE;
+            // Amount to shift so beat is when the user show press
+            let padding = -(2.0 + i as f32) * BEAT_SIZE;
             if l {
                 cubes.push(Cube {
                     transform: Transform {
-                        position: (-COLUMN_WIDTH, 0.0, start_dist).into(),
+                        position: (-COLUMN_WIDTH, 0.0, padding).into(),
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
@@ -258,7 +255,7 @@ impl GameState {
             if m {
                 cubes.push(Cube {
                     transform: Transform {
-                        position: (0.0, 0.0, start_dist).into(),
+                        position: (0.0, 0.0, padding).into(),
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
@@ -268,7 +265,7 @@ impl GameState {
             if r {
                 cubes.push(Cube {
                     transform: Transform {
-                        position: (COLUMN_WIDTH, 0.0, start_dist).into(),
+                        position: (COLUMN_WIDTH, 0.0, padding).into(),
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
@@ -355,6 +352,7 @@ impl Transform {
 
 struct Map {
     bpm: f32,
+    subdivisions: f32,
     beats: Vec<(bool, bool, bool)>,
 }
 
