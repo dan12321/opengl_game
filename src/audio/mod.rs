@@ -1,3 +1,5 @@
+mod audio_file;
+
 use std::cell::RefCell;
 use std::f32::consts::PI;
 use std::thread::{self, JoinHandle};
@@ -11,6 +13,8 @@ use cpal::{
 
 use tracing::debug;
 
+use self::audio_file::Wav;
+
 pub struct Audio {
     sender: Sender<i32>,
     th: JoinHandle<()>,
@@ -18,11 +22,12 @@ pub struct Audio {
 
 impl Audio {
     pub fn new() -> Self {
+        let wav = audio_file::Wav::new("assets/sounds/test.wav".into());
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
 
         let child = thread::spawn(move || {
-            let audio_thread = AudioThread::new(receiver);
+            let audio_thread = Mixer::new(receiver, wav);
             audio_thread.run();
         });
         Audio {
@@ -37,14 +42,21 @@ impl Audio {
     }
 }
 
-pub struct AudioThread {
+impl Drop for Audio {
+    fn drop(&mut self) {
+        self.sender.send(2).unwrap();
+    }
+}
+
+struct Mixer {
     device: Device,
     config: SupportedStreamConfig,
     receiver: Receiver<i32>,
+    wav: Wav,
 }
 
-impl AudioThread {
-    pub fn new(receiver: Receiver<i32>) -> Self {
+impl Mixer {
+    fn new(receiver: Receiver<i32>, wav: Wav) -> Self {
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         let device_name = device.name().unwrap();
@@ -52,14 +64,15 @@ impl AudioThread {
         let config = device.default_output_config().unwrap();
         debug!(device = device_name, config = format!("{:?}", &config), "Output device");
     
-        AudioThread {
+        Mixer {
             device,
             config: config.into(),
             receiver,
+            wav,
         }
     }
 
-    pub fn run(&self) {
+    fn run(&self) {
         match self.config.sample_format() {
             cpal::SampleFormat::I8 => self.play_sin::<i8>(),
             cpal::SampleFormat::I16 => self.play_sin::<i16>(),
@@ -88,13 +101,24 @@ impl AudioThread {
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
         let mut last = 0;
+        let mut wav_position = 0;
+        let wav = self.wav.samples.clone();
+        debug!(wav = format!("{:?}", &wav[0..32]), "play");
         let mut next_value = move || {
             if receiver.try_recv().unwrap_or(last) == 1 {
                 last = 1;
-                sample_clock = (sample_clock + 1.0) % sample_rate;
-                (sample_clock * 440.0 * 2.0 * PI / sample_rate).sin()
+                let sample = wav[wav_position];
+                wav_position += 1;
+                if wav_position >= wav.len() {
+                    last = 0;
+                    wav_position = 0;
+                }
+                sample / 32_768.0
+                //sample_clock = (sample_clock + 1.0) % sample_rate;
+                //(sample_clock * 440.0 * 2.0 * PI / sample_rate).sin()
             } else {
                 last = 0;
+                wav_position = 0;
                 0.0
             }
         };
@@ -117,7 +141,7 @@ impl AudioThread {
             debug!(last_message = last_message, "last audio message");
             if last_message == 1 {
                 sender.send(1).unwrap();
-                thread::sleep(Duration::from_secs(1));
+                thread::sleep(Duration::from_secs(2));
                 sender.send(0).unwrap();
             }
             last_message = self.receiver.recv().unwrap();

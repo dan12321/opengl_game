@@ -18,7 +18,7 @@ extern crate tracing_subscriber;
 
 use std::time::Instant;
 
-use audio::{Audio, AudioThread};
+use audio::Audio;
 use controller::{Button, Controller};
 use glfw::Context;
 use render::Renderer;
