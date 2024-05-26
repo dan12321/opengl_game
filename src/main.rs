@@ -1,8 +1,6 @@
 mod camera;
 mod config;
 mod controller;
-mod light;
-mod model;
 mod physics;
 mod render;
 mod shader;

@@ -6,7 +6,7 @@ use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::Controller;
 use crate::physics::AABBColider;
-use crate::{light::LightUniform, model::Material};
+use crate::shader::{LightUniform, Material};
 
 pub struct GameState {
     pub cubes: Vec<Cube>,

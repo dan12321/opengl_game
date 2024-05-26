@@ -1,238 +1,13 @@
-use std::collections::HashMap;
-use std::ffi::{CString, NulError};
+use std::ffi::CString;
 use std::fs::OpenOptions;
 use std::io::{Error as IoError, Read};
 use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::{ptr, str};
 
-use na::Matrix4;
 use tracing::error;
 
 use gl::types::*;
-
-pub struct Shader {
-    id: u32,
-    uniform1fs: HashMap<String, Uniform<f32>>,
-    uniform1is: HashMap<String, Uniform<i32>>,
-    uniform2fs: HashMap<String, Uniform<(f32, f32)>>,
-    uniform3fs: HashMap<String, Uniform<(f32, f32, f32)>>,
-    uniform_matrix4s: HashMap<String, Uniform<Matrix4<f32>>>,
-}
-
-impl Shader {
-    pub fn new(vertex_shader_path: &str, fragment_shader_path: &str) -> Result<Self, OpenGLError> {
-        let vert_path = PathBuf::from(vertex_shader_path);
-        let frag_path = PathBuf::from(fragment_shader_path);
-        let vertex_shader = unsafe { create_shader(&vert_path, gl::VERTEX_SHADER)? };
-        let fragment_shader = unsafe { create_shader(&frag_path, gl::FRAGMENT_SHADER)? };
-        let shader_program = unsafe { gl::CreateProgram() };
-        unsafe {
-            gl::AttachShader(shader_program, vertex_shader);
-            gl::AttachShader(shader_program, fragment_shader);
-            gl::LinkProgram(shader_program);
-            let mut success = gl::FALSE as GLsizei;
-            gl::GetProgramiv(shader_program, gl::LINK_STATUS, &mut success);
-            if success == (gl::FALSE as GLsizei) {
-                let mut len = 0;
-                gl::GetProgramiv(shader_program, gl::INFO_LOG_LENGTH, &mut len);
-                let mut error_buffer = Vec::with_capacity(len as usize);
-                error_buffer.set_len(len as usize - 1);
-                gl::GetProgramInfoLog(
-                    shader_program,
-                    len,
-                    ptr::null_mut(),
-                    error_buffer.as_mut_ptr() as *mut GLchar,
-                );
-                return Err(OpenGLError::FailedToLinkProgram(String::from_utf8(error_buffer)));
-            }
-            gl::DeleteShader(vertex_shader);
-            gl::DeleteShader(fragment_shader);
-        }
-        return Ok(Self {
-            id: shader_program,
-            uniform1fs: HashMap::new(),
-            uniform2fs: HashMap::new(),
-            uniform3fs: HashMap::new(),
-            uniform1is: HashMap::new(),
-            uniform_matrix4s: HashMap::new(),
-        });
-    }
-
-    pub unsafe fn use_program(&self) {
-        gl::UseProgram(self.id);
-    }
-
-    pub fn add_uniform1f(mut self, name: &str, value: f32) -> Result<Self, NulError> {
-        unsafe { gl::UseProgram(self.id) };
-        let name_cstring = CString::new(name.as_bytes()).unwrap();
-        let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
-        unsafe {
-            gl::Uniform1f(location, value);
-        }
-        let uniform = Uniform::new(location, value);
-        self.uniform1fs.insert(name.into(), uniform);
-        Ok(self)
-    }
-
-    pub fn get_uniform1f(&self, name: &str) -> Option<f32> {
-        match self.uniform1fs.get(name) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    /// Sets the value of the uniform in the shader
-    /// Returns the old value or none if the uniform doesn't exist
-    pub fn set_uniform1f(&mut self, name: &str, value: f32) -> Option<f32> {
-        unsafe { gl::UseProgram(self.id) };
-        let old_uniform = self.uniform1fs.get(name)?;
-        unsafe {
-            gl::Uniform1f(old_uniform.location, value);
-        }
-        let new_uniform = Uniform::new(old_uniform.location, value);
-        match self.uniform1fs.insert(name.into(), new_uniform) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    pub fn add_uniform1i(mut self, name: &str, value: i32) -> Result<Self, NulError> {
-        unsafe { gl::UseProgram(self.id) };
-        let name_cstring = CString::new(name.as_bytes()).unwrap();
-        let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
-        unsafe {
-            gl::Uniform1i(location, value);
-        }
-        let uniform = Uniform::new(location, value);
-        self.uniform1is.insert(name.into(), uniform);
-        Ok(self)
-    }
-
-    pub fn get_uniform1i(&self, name: &str) -> Option<i32> {
-        match self.uniform1is.get(name) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    /// Sets the value of the uniform in the shader
-    /// Returns the old value or none if the uniform doesn't exist
-    pub fn set_uniform1i(&mut self, name: &str, value: i32) -> Option<i32> {
-        unsafe { gl::UseProgram(self.id) };
-        let old_uniform = self.uniform1is.get(name)?;
-        unsafe {
-            gl::Uniform1i(old_uniform.location, value);
-        }
-        let new_uniform = Uniform::new(old_uniform.location, value);
-        match self.uniform1is.insert(name.into(), new_uniform) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    pub fn add_uniform_mat4(mut self, name: &str, value: Matrix4<f32>) -> Result<Self, NulError> {
-        unsafe { gl::UseProgram(self.id) };
-        let name_cstring = CString::new(name.as_bytes()).unwrap();
-        let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
-        let data = value.as_ptr();
-        unsafe {
-            gl::UniformMatrix4fv(location, 1, gl::FALSE, data);
-        }
-        let uniform = Uniform::new(location, value);
-        self.uniform_matrix4s.insert(name.into(), uniform);
-        Ok(self)
-    }
-
-    pub fn get_uniform_mat4(&self, name: &str) -> Option<Matrix4<f32>> {
-        match self.uniform_matrix4s.get(name) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    /// Sets the value of the uniform in the shader
-    /// Returns the old value or none if the uniform doesn't exist
-    pub fn set_uniform_mat4(&mut self, name: &str, value: Matrix4<f32>) -> Option<Matrix4<f32>> {
-        unsafe { gl::UseProgram(self.id) };
-        let old_uniform = self.uniform_matrix4s.get(name)?;
-        let data = value.as_ptr();
-        unsafe { gl::UniformMatrix4fv(old_uniform.location, 1, gl::FALSE, data) }
-        let new_uniform = Uniform::new(old_uniform.location, value);
-        match self.uniform_matrix4s.insert(name.into(), new_uniform) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    pub fn add_uniform2f(mut self, name: &str, value: (f32, f32)) -> Result<Self, NulError> {
-        unsafe { gl::UseProgram(self.id) };
-        let name_cstring = CString::new(name.as_bytes()).unwrap();
-        let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
-        unsafe {
-            gl::Uniform2f(location, value.0, value.1);
-        }
-        let uniform = Uniform::new(location, value);
-        self.uniform2fs.insert(name.into(), uniform);
-        Ok(self)
-    }
-
-    pub fn get_uniform2f(&self, name: &str) -> Option<(f32, f32)> {
-        match self.uniform2fs.get(name) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    /// Sets the value of the uniform in the shader
-    /// Returns the old value or none if the uniform doesn't exist
-    pub fn set_uniform2f(&mut self, name: &str, value: (f32, f32)) -> Option<(f32, f32)> {
-        unsafe { gl::UseProgram(self.id) };
-        let old_uniform = self.uniform2fs.get(name)?;
-        unsafe {
-            gl::Uniform2f(old_uniform.location, value.0, value.1);
-        }
-        let new_uniform = Uniform::new(old_uniform.location, value);
-        match self.uniform2fs.insert(name.into(), new_uniform) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    pub fn add_uniform3f(mut self, name: &str, value: (f32, f32, f32)) -> Result<Self, NulError> {
-        unsafe { gl::UseProgram(self.id) };
-        let name_cstring = CString::new(name.as_bytes()).unwrap();
-        let location = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
-        unsafe {
-            gl::Uniform3f(location, value.0, value.1, value.2);
-        }
-        let uniform = Uniform::new(location, value);
-        self.uniform3fs.insert(name.into(), uniform);
-        Ok(self)
-    }
-
-    pub fn get_uniform3f(&self, name: &str) -> Option<(f32, f32, f32)> {
-        match self.uniform3fs.get(name) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-
-    /// Sets the value of the uniform in the shader
-    /// Returns the old value or none if the uniform doesn't exist
-    pub fn set_uniform3f(&mut self, name: &str, value: (f32, f32, f32)) -> Option<(f32, f32, f32)> {
-        unsafe { gl::UseProgram(self.id) };
-        let old_uniform = self.uniform3fs.get(name)?;
-        unsafe {
-            gl::Uniform3f(old_uniform.location, value.0, value.1, value.2);
-        }
-        let new_uniform = Uniform::new(old_uniform.location, value);
-        match self.uniform3fs.insert(name.into(), new_uniform) {
-            Some(u) => Some(u.value),
-            None => None,
-        }
-    }
-}
 
 pub unsafe fn create_shader(
     shader_path: &PathBuf,
@@ -280,20 +55,43 @@ pub unsafe fn create_shader(
     Ok(shader)
 }
 
-struct Uniform<T> {
-    location: i32,
-    value: T,
-}
-
-impl<T> Uniform<T> {
-    fn new(location: i32, value: T) -> Self {
-        Self { location, value }
-    }
-}
-
 #[derive(Debug)]
 pub enum OpenGLError {
     FailedToCompileShader,
     FailedToReadShader(IoError),
     FailedToLinkProgram(Result<String, FromUtf8Error>),
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Material {
+    pub ambient: (f32, f32, f32),
+    pub diffuse: (f32, f32, f32),
+    pub specular: (f32, f32, f32),
+    pub shininess: GLint,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct LightUniform {
+    pub position: (GLfloat, GLfloat, GLfloat),
+    pub diffuse: (GLfloat, GLfloat, GLfloat),
+    pub specular: (GLfloat, GLfloat, GLfloat),
+    pub strength: GLfloat,
+}
+
+pub fn template_light(index: usize, prop: Prop) -> String {
+    let property = match prop {
+        Prop::Position => "position",
+        Prop::Diffuse => "diffuse",
+        Prop::Specular => "specular",
+        Prop::Strength => "strength",
+    };
+
+    format!("pointLights[{}].{}", index, property)
+}
+
+pub enum Prop {
+    Position,
+    Diffuse,
+    Specular,
+    Strength,
 }

@@ -10,8 +10,7 @@ use image::DynamicImage;
 use na::Matrix4;
 
 use crate::{
-    light::{self, template_light, LightUniform},
-    shader::{create_shader, OpenGLError},
+    shader::{create_shader, OpenGLError, template_light, LightUniform, Prop},
     state::{Cube, XYZ},
 };
 
@@ -157,10 +156,10 @@ impl CubeRenderer {
                 strength: -1,
             }; MAX_LIGHTS];
             for i in 0..MAX_LIGHTS {
-                let pos = template_light(i, light::Prop::Position);
-                let dif = template_light(i, light::Prop::Diffuse);
-                let spec = template_light(i, light::Prop::Specular);
-                let stren = template_light(i, light::Prop::Strength);
+                let pos = template_light(i, Prop::Position);
+                let dif = template_light(i, Prop::Diffuse);
+                let spec = template_light(i, Prop::Specular);
+                let stren = template_light(i, Prop::Strength);
                 let position = CString::new(pos.as_bytes()).unwrap();
                 let diffuse = CString::new(dif.as_bytes()).unwrap();
                 let specular = CString::new(spec.as_bytes()).unwrap();

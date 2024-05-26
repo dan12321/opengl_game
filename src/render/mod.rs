@@ -12,7 +12,7 @@ use na::Perspective3;
 use plane_renderer::PlaneRenderer;
 use spot_light_renderer::SpotLightRenderer;
 
-use crate::light::LightUniform;
+use crate::shader::LightUniform;
 use crate::state::GameState;
 
 use super::config::{

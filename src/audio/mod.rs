@@ -1,11 +1,8 @@
 mod audio_file;
 
-use std::cell::RefCell;
-use std::f32::consts::PI;
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::sync::mpsc::{Sender, Receiver};
-use std::sync::{mpsc, RwLock};
-use std::time::Duration;
+use std::sync::mpsc;
 
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Sample, SizedSample, StreamConfig, SupportedStreamConfig
@@ -17,7 +14,6 @@ use self::audio_file::Wav;
 
 pub struct Audio {
     sender: Sender<i32>,
-    th: JoinHandle<()>,
 }
 
 impl Audio {
@@ -27,19 +23,13 @@ impl Audio {
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
 
-        let child = thread::spawn(move || {
+        thread::spawn(move || {
             let audio_thread = Mixer::new(receiver, vec![music_wav, death_wav]);
             audio_thread.run();
         });
         Audio {
             sender,
-            th: child,
         }
-    }
-
-    pub fn collision_effect(&self) {
-        self.sender.send(1).unwrap();
-        self.sender.send(0).unwrap();
     }
 
     pub fn collided(&self) {
@@ -98,11 +88,11 @@ impl Mixer {
         T: SizedSample + FromSample<f32>,
     {
         let config: StreamConfig = self.config.config();
-        let sample_rate = config.sample_rate.0 as f32;
+        // let sample_rate = config.sample_rate.0 as f32;
         let channels = config.channels as usize;
     
         // Produce a sinusoid of maximum amplitude.
-        let mut sample_clock = 0f32;
+        // let mut sample_clock = 0f32;
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
         let mut last = 0;

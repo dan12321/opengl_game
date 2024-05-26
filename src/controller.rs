@@ -89,8 +89,4 @@ impl<'a> Controller<'a> {
     pub fn direction(&self) -> f32 {
         self.direction_x
     }
-
-    pub fn mouse(&self) -> (f32, f32, f32) {
-        (self.camera_x, self.camera_y, self.zoom)
-    }
 }
