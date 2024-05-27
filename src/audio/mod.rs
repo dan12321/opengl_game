@@ -50,6 +50,10 @@ impl Audio {
     }
 
     pub fn collided(&self) {
+        self.sender.send(1).unwrap();
+    }
+
+    pub fn reset(&self) {
         self.sender.send(2).unwrap();
     }
 }
@@ -116,21 +120,15 @@ impl Mixer {
             last = receiver.try_recv().unwrap_or(last);
             if last == 2 {
                 music_wav_second = 0.0;
-                last = 1;
+                last = 0;
             }
 
-            if last != 0 {
+            if last == 1 && death_wav_position < death_wav.len() {
                 let sample = death_wav[death_wav_position];
+                result += sample / 32_768.0;
                 death_wav_position += 1;
-                if death_wav_position >= death_wav.len() {
-                    last = 0;
-                    death_wav_position = 0;
-                }
-                result += sample / 32_768.0
-            } else {
-                last = 0;
+            } else if last != 1 {
                 death_wav_position = 0;
-                result += 0.0
             }
 
             let raw_index = music_wav_second * music_sample_rate;
@@ -141,7 +139,12 @@ impl Mixer {
             let lower = music_wav[lower_index as usize % limit];
             let upper = music_wav[upper_index as usize % limit];
             let music_sample = upper * dist_to_lower + lower * (1.0 - dist_to_lower);
-            music_wav_second += seconds_per_sample;
+            let music_wav_step = if last == 1 {
+                seconds_per_sample * 0.9
+            } else {
+                seconds_per_sample
+            };
+            music_wav_second += music_wav_step;
             result += music_sample / 32_768.0;
 
             // music_wav_second as f32 caused varying rate so use f64 and

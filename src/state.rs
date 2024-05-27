@@ -4,7 +4,7 @@ use na::{vector, Matrix4, Rotation3};
 
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
-use crate::controller::Controller;
+use crate::controller::{Button, Controller};
 use crate::physics::AABBColider;
 use crate::shader::{LightUniform, Material};
 
@@ -16,7 +16,7 @@ pub struct GameState {
     pub plane: Plane,
     pub camera: Camera,
     map: Map,
-    pub collided: bool,
+    pub status: Status,
 }
 
 impl GameState {
@@ -107,15 +107,22 @@ impl GameState {
                 offset: 0.0,
             },
             map,
-            collided: false,
+            status: Status::Alive,
         }
     }
 
     pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
+        self.status = match self.status {
+            Status::Alive => self.alive_update(delta_time, controller),
+            Status::Dead => self.dead_update(delta_time, controller),
+            Status::Resetting => self.resetting_update(),
+        }
+    }
+
+    fn alive_update(&mut self, delta_time: Duration, controller: &Controller) -> Status {
         // timing properties
         let dt = delta_time.as_secs_f32();
         let displacement = config::MOVE_SPEED * dt;
-        self.collided = false;
 
         // controller input
         let x = controller.direction();
@@ -160,6 +167,9 @@ impl GameState {
             self.player.cube.transform.position.x = -movable_width;
         }
 
+        // plane update
+        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+
         // Check collisions
         let player_collider = AABBColider {
             position: self.player.cube.transform.position,
@@ -171,22 +181,55 @@ impl GameState {
                 scale: cube.transform.scale,
             };
             if player_collider.aabb_colided(&collider) {
-                self.reset();
-                self.collided = true;
-                break;
+                return Status::Dead;
             }
         }
 
-        // plane update
-        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+        Status::Alive
     }
 
-    fn reset(&mut self) {
+    fn dead_update(&mut self, delta_time: Duration, controller: &Controller) -> Status {
+        // timing properties
+        let dt = delta_time.as_secs_f32();
+        let speed_ratio = 0.5;
+        let displacement = speed_ratio * self.speed * dt;
+
+        // lights update
+        for light in &mut self.lights {
+            if light.transform.position.z > 50.0 {
+                light.transform.position.z = -90.0;
+            }
+            light.transform.position.z += displacement;
+        }
+
+        // cubes update
+        for cube in &mut self.cubes {
+            cube.transform.position.z += displacement;
+        }
+
+        // player update
+        self.player.cube.transform.position.z += displacement;
+
+        // plane update
+        self.plane.offset -= displacement / PLANE_LENGTH;
+
+        // controller input
+        let reset = controller.buttons().contains(&Button::Restart);
+        if reset {
+            Status::Resetting
+        } else {
+            Status::Dead
+        }
+    }
+
+    fn resetting_update(&mut self) -> Status {
         self.lights = Self::starting_lights();
         self.cubes = Self::starting_cubes(&self.map);
         self.player.cube.transform.position.x = 0.0;
+        self.player.cube.transform.position.z = 0.0;
         self.player.target_lane = 1;
         self.player.current_lane = 1;
+        Status::Alive
     }
 
     fn starting_lights() -> Vec<Light> {
@@ -363,3 +406,10 @@ pub static PLAYER_MATERIAL: Material = Material {
     specular: (0.7, 0.7, 0.7),
     shininess: 8,
 };
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum Status {
+    Alive,
+    Dead,
+    Resetting,
+}

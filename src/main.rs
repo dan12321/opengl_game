@@ -20,7 +20,7 @@ use audio::Audio;
 use controller::{Button, Controller};
 use glfw::Context;
 use render::Renderer;
-use state::GameState;
+use state::{GameState, Status};
 use tracing::Level;
 
 fn main() {
@@ -66,6 +66,7 @@ fn main() {
 
     // Program Setup
     let mut state = GameState::new();
+    let mut last_status = state.status;
     let mut controller = Controller::new(&mut glfw, events);
     let renderer = Renderer::new(window_width, window_height);
     let audio = Audio::new();
@@ -82,13 +83,19 @@ fn main() {
         for button in controller.buttons() {
             match button {
                 Button::Quit => window.set_should_close(true),
+                _ => (),
             }
         }
 
         state.update(delta_time, &controller);
-        if state.collided {
-            audio.collided();
+        if state.status != last_status {
+            match state.status {
+                Status::Alive => (),
+                Status::Dead => audio.collided(),
+                Status::Resetting => audio.reset(),
+            }
         }
         renderer.render(&state);
+        last_status = state.status;
     }
 }

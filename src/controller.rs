@@ -14,7 +14,9 @@ pub struct Controller<'a> {
     events: Receiver<(f64, WindowEvent)>,
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Button {
+    Restart,
     Quit,
 }
 
@@ -39,6 +41,9 @@ impl<'a> Controller<'a> {
             match event {
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     buttons.push(Button::Quit);
+                }
+                WindowEvent::Key(Key::R, _, Action::Press, _) => {
+                    buttons.push(Button::Restart);
                 }
                 WindowEvent::Key(Key::Right, _, Action::Press, _) => {
                     self.direction_x = 1.0;
