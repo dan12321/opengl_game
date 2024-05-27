@@ -7,9 +7,10 @@
   - [X] [cpal](https://github.com/RustAudio/cpal) low level cross platform
     - Can build output stream react to inputs?
     - Likely need an audio thread running that receives messages
-  - [ ] Speed up audio load time
+  - [ ] Speed up audio load time (kinda like the pitch shift solo)
   - [X] Fix speed higher than expected (samples per second should respect config)
-  - [ ] Pitch changes through the song in a repeatable way
+  - [X] Pitch changes through the song in a repeatable way
+    - Increased precision of time variables to f64.
 - [ ] Misc
   - [ ] Add menus
   - [ ] Add scenes

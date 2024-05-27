@@ -4,7 +4,6 @@ use std::thread;
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 
-use cpal::SampleRate;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Sample, SizedSample, StreamConfig, SupportedStreamConfig
 };
@@ -99,12 +98,10 @@ impl Mixer {
         T: SizedSample + FromSample<f32>,
     {
         let config: StreamConfig = self.config.config();
-        let sample_rate = config.sample_rate.0 as f32;
+        let sample_rate = config.sample_rate.0 as f64;
         let seconds_per_sample = 1.0 / sample_rate;
         let channels = config.channels as usize;
-    
-        // Produce a sinusoid of maximum amplitude.
-        // let mut sample_clock = 0f32;
+
         let (sender, receiver) = mpsc::channel();
         sender.send(0).unwrap();
         let mut last = 0;
@@ -112,8 +109,7 @@ impl Mixer {
         let mut music_wav_second = 0.0;
         let death_wav = self.wavs[1].samples.clone();
         let music_wav = self.wavs[0].samples.clone();
-        let music_sample_rate = self.wavs[0].sample_rate;
-        let music_seconds_per_sample = 1.0 / music_sample_rate as f32;
+        let music_sample_rate = self.wavs[0].sample_rate as f64;
         debug!(wav = format!("{:?}", &death_wav[0..32]), "play");
         let mut next_value = move || {
             let mut result = 0.0;
@@ -131,15 +127,13 @@ impl Mixer {
                     death_wav_position = 0;
                 }
                 result += sample / 32_768.0
-                //sample_clock = (sample_clock + 1.0) % sample_rate;
-                //(sample_clock * 440.0 * 2.0 * PI / sample_rate).sin()
             } else {
                 last = 0;
                 death_wav_position = 0;
                 result += 0.0
             }
 
-            let raw_index = music_wav_second / music_seconds_per_sample;
+            let raw_index = music_wav_second * music_sample_rate;
             let limit = music_wav.len();
             let lower_index = raw_index.floor();
             let upper_index = raw_index.ceil();
@@ -150,7 +144,9 @@ impl Mixer {
             music_wav_second += seconds_per_sample;
             result += music_sample / 32_768.0;
 
-            result
+            // music_wav_second as f32 caused varying rate so use f64 and
+            // convert to f32 at the end
+            result as f32
         };
     
         let err_fn = |err| eprintln!("an error occurred on stream: {}", err);

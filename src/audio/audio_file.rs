@@ -4,7 +4,7 @@ use tracing::debug;
 
 #[derive(Clone, Debug)]
 pub struct Wav {
-    pub samples: Vec<f32>,
+    pub samples: Vec<f64>,
     pub sample_rate: u32,
 }
 
@@ -70,14 +70,14 @@ fn read_from_buffer<const T: usize>(slice: &[u8]) -> [u8;T] {
     bytes
 }
 
-fn parse_samples(bytes: &[u8]) -> Vec<f32> {
+fn parse_samples(bytes: &[u8]) -> Vec<f64> {
     let num_samples = bytes.len() / 2;
     let mut samples = Vec::with_capacity(num_samples);
     for i in 0..num_samples {
         let pos = i * 2;
         let byte: [u8; 2] = read_from_buffer(&bytes[pos..pos+2]);
         let int = i16::from_le_bytes(byte);
-        samples.push(int as f32);
+        samples.push(int as f64);
     }
     samples
 }
