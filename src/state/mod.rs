@@ -1,6 +1,9 @@
+mod map;
+
 use std::time::Duration;
 
 use na::{vector, Matrix4, Rotation3};
+use map::Map;
 
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
@@ -22,59 +25,7 @@ pub struct GameState {
 impl GameState {
     pub fn new() -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
-        let map = Map {
-            bpm: 140.0,
-            subdivisions: 2.0,
-            beats: vec![
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (true, true, false),
-                (true, true, false),
-                (true, false, true),
-                (true, false, true),
-                (false, true, true),
-                (false, true, true),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
-                (false, true, false),
-                (false, true, false),
-                (false, true, false),
-                (true, false, true),
-                (true, false, true),
-                (true, true, false),
-                (true, true, false),
-                (true, true, false),
-                (true, false, true),
-                (true, false, true),
-                (true, false, true),
-                (false, true, true),
-                (false, true, true),
-                (true, false, true),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (false, false, false),
-                (true, false, true),
-            ],
-        };
+        let map = Map::from_file(&"assets/maps/GameSongMono.txt".into());
 
         let cubes = Self::starting_cubes(&map);
         let lights = Self::starting_lights();
@@ -394,11 +345,6 @@ impl Transform {
     }
 }
 
-struct Map {
-    bpm: f32,
-    subdivisions: f32,
-    beats: Vec<(bool, bool, bool)>,
-}
 
 pub static PLAYER_MATERIAL: Material = Material {
     ambient: (0.3, 0.3, 0.3),
