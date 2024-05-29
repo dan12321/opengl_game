@@ -1,6 +1,7 @@
 mod audio_file;
 
-use std::thread;
+use std::path::PathBuf;
+use std::{fs, thread};
 use std::sync::mpsc::{Sender, Receiver};
 use std::sync::mpsc;
 
@@ -17,8 +18,13 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn new() -> Self {
-        let wav_files = ["assets/sounds/GameSongMono.wav", "assets/sounds/test.wav"];
+    pub fn new(level: &PathBuf) -> Self {
+        let mut dir = fs::read_dir(level).unwrap();
+        let file = dir.find(|f| {
+            f.as_ref().unwrap().file_name().to_str().unwrap().ends_with(".wav")
+        }).unwrap().unwrap().file_name();
+        let full_path = level.join(file);
+        let wav_files: [PathBuf; 2] = [full_path, "assets/sounds/test.wav".into()];
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         let device_name = device.name().unwrap();
@@ -29,7 +35,7 @@ impl Audio {
 
         let mut wavs: Vec<Wav> = Vec::with_capacity(wav_files.len());
         for wav_file in wav_files {
-            let wav = audio_file::Wav::new(wav_file.into());
+            let wav = audio_file::Wav::new(wav_file);
             wavs.push(wav);
         }
         let (sender, receiver) = mpsc::channel();

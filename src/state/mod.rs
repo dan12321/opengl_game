@@ -1,5 +1,7 @@
 mod map;
 
+use std::fs::{self, FileType};
+use std::path::PathBuf;
 use std::time::Duration;
 
 use na::{vector, Matrix4, Rotation3};
@@ -23,9 +25,15 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new() -> Self {
+    pub fn new(level: &PathBuf) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
-        let map = Map::from_file(&"assets/maps/GameSongMono.txt".into());
+
+        let mut dir = fs::read_dir(level).unwrap();
+        let file = dir.find(|f| {
+            f.as_ref().unwrap().file_name().to_str().unwrap().ends_with(".txt")
+        }).unwrap().unwrap().file_name();
+        let full_path = level.join(file);
+        let map = Map::from_file(&full_path);
 
         let cubes = Self::starting_cubes(&map);
         let lights = Self::starting_lights();

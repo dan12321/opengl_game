@@ -65,11 +65,11 @@ fn main() {
     }
 
     // Program Setup
-    let mut state = GameState::new();
+    let mut state = GameState::new(&"assets/maps/sad".into());
     let mut last_status = state.status;
     let mut controller = Controller::new(&mut glfw, events);
     let renderer = Renderer::new(window_width, window_height);
-    let audio = Audio::new();
+    let audio = Audio::new(&"assets/maps/sad".into());
 
     let mut last_time = Instant::now();
     while !window.should_close() {
