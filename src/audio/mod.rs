@@ -124,9 +124,8 @@ impl Mixer {
         let (sender, receiver) = mpsc::channel::<Action>();
         let wavs = self.wavs.clone();
         let mut tracks: HashMap<usize, Track> = HashMap::new();
-        let mut next_value = move || {
-            Self::get_next_audio_value(&wavs, &receiver, &mut tracks, &seconds_per_sample)
-        };
+        let mut next_value =
+            move || Self::get_next_audio_value(&wavs, &receiver, &mut tracks, &seconds_per_sample);
 
         let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 

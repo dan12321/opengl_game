@@ -1,18 +1,17 @@
 mod map;
 
-use std::fs::{self, FileType};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use na::{vector, Matrix4, Rotation3};
 use map::Map;
+use na::{vector, Matrix4, Rotation3};
 
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
+use crate::file_utils;
 use crate::physics::AABBColider;
 use crate::shader::{LightUniform, Material};
-use crate::file_utils;
 
 pub struct GameState {
     pub cubes: Vec<Cube>,
@@ -349,7 +348,6 @@ impl Transform {
             * na::Scale3::new(self.scale.x, self.scale.y, self.scale.z).to_homogeneous()
     }
 }
-
 
 pub static PLAYER_MATERIAL: Material = Material {
     ambient: (0.3, 0.3, 0.3),

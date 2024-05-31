@@ -3,7 +3,7 @@ use std::mem;
 use std::path::PathBuf;
 use std::ptr;
 
-use crate::shader::{OpenGLError, create_shader};
+use crate::shader::{create_shader, OpenGLError};
 use crate::state::Light;
 
 use gl;
@@ -31,7 +31,7 @@ impl SpotLightRenderer {
             // Create Program
             let vert = create_shader(vert_shader, gl::VERTEX_SHADER)?;
             let frag = create_shader(frag_shader, gl::FRAGMENT_SHADER)?;
-    
+
             let program = gl::CreateProgram();
             gl::AttachShader(program, vert);
             gl::AttachShader(program, frag);
@@ -79,22 +79,15 @@ impl SpotLightRenderer {
             gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
 
             let stride = 3 * mem::size_of::<GLfloat>() as i32;
-            gl::VertexAttribPointer(
-                0,
-                3,
-                gl::FLOAT,
-                gl::FALSE,
-                stride,
-                ptr::null()
-            );
+            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
             gl::EnableVertexAttribArray(0);
-            
+
             // Get Uniforms
             let projection_uniform = gl::GetUniformLocation(program, PROJECTION.as_ptr());
             let view_uniform = gl::GetUniformLocation(program, VIEW.as_ptr());
             let transformation_uniform = gl::GetUniformLocation(program, TRANSFORMATION.as_ptr());
             let color_uniform = gl::GetUniformLocation(program, COLOR.as_ptr());
-            
+
             Ok(Self {
                 shader_id: program,
                 vao,
@@ -107,12 +100,7 @@ impl SpotLightRenderer {
         }
     }
 
-    pub fn draw(
-        &self,
-        lights: &[Light],
-        view: Matrix4<f32>,
-        projection: Matrix4<f32>,
-    ) {
+    pub fn draw(&self, lights: &[Light], view: Matrix4<f32>, projection: Matrix4<f32>) {
         unsafe {
             gl::UseProgram(self.shader_id);
             gl::BindVertexArray(self.vao);
@@ -151,4 +139,4 @@ const TRANSFORMATION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"transformation\0") };
 const PROJECTION: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"projection\0") };
 const VIEW: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"view\0") };
-const COLOR: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"color\0")};
+const COLOR: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"color\0") };

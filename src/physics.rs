@@ -28,12 +28,12 @@ impl AABBColider {
     pub fn aabb_colided(&self, cube: &AABBColider) -> bool {
         let a = self.to_sides();
         let b = cube.to_sides();
-        a.back <= b.front &&
-            a.front >= b.back &&
-            a.left <= b.right &&
-            a.right >= b.left &&
-            a.bottom <= b.top &&
-            a.top >= b.bottom
+        a.back <= b.front
+            && a.front >= b.back
+            && a.left <= b.right
+            && a.right >= b.left
+            && a.bottom <= b.top
+            && a.top >= b.bottom
     }
 
     fn to_sides(&self) -> Sides {
@@ -47,4 +47,3 @@ impl AABBColider {
         }
     }
 }
-

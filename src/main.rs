@@ -1,13 +1,13 @@
+mod audio;
 mod camera;
 mod config;
 mod controller;
+mod file_utils;
 mod physics;
 mod render;
 mod shader;
 mod shape;
 mod state;
-mod audio;
-mod file_utils;
 
 extern crate glfw;
 extern crate image;
@@ -15,7 +15,7 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
-use std::{path::PathBuf, time::Instant};
+use std::time::Instant;
 
 use audio::Audio;
 use controller::{Button, Controller};
@@ -100,11 +100,11 @@ fn main() {
                 Status::Dead => {
                     audio.track_action(audio::Action::Slow(song_track));
                     audio.track_action(audio::Action::Play(death_track));
-                },
+                }
                 Status::Resetting => {
                     audio.track_action(audio::Action::Reset(song_track));
                     audio.track_action(audio::Action::Play(song_track));
-                },
+                }
             }
         }
         renderer.render(&state);

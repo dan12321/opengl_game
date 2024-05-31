@@ -10,7 +10,7 @@ use image::DynamicImage;
 use na::Matrix4;
 
 use crate::{
-    shader::{create_shader, OpenGLError, template_light, LightUniform, Prop},
+    shader::{create_shader, template_light, LightUniform, OpenGLError, Prop},
     state::{Plane, XYZ},
 };
 
@@ -271,8 +271,7 @@ impl PlaneRenderer {
 
 const TRANSFORMATION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"transformation\0") };
-const OFFSET: &'static CStr =
-    unsafe { CStr::from_bytes_with_nul_unchecked(b"offset\0") };
+const OFFSET: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"offset\0") };
 const PROJECTION: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"projection\0") };
 const VIEW: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"view\0") };
 const CAMERA_POSITION: &'static CStr =

@@ -10,7 +10,7 @@ use image::DynamicImage;
 use na::Matrix4;
 
 use crate::{
-    shader::{create_shader, OpenGLError, template_light, LightUniform, Prop},
+    shader::{create_shader, template_light, LightUniform, OpenGLError, Prop},
     state::{Cube, XYZ},
 };
 

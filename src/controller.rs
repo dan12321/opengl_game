@@ -2,7 +2,7 @@ use std::sync::mpsc::Receiver;
 
 use super::config;
 use super::config::{MAX_ZOOM, MIN_ZOOM, SCROLL_ZOOM_SCALE};
-use glfw::{Action, Glfw, Key, WindowEvent, Window};
+use glfw::{Action, Glfw, Key, Window, WindowEvent};
 
 pub struct Controller<'a> {
     direction_x: f32,
