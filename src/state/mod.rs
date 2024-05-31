@@ -12,6 +12,7 @@ use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
 use crate::physics::AABBColider;
 use crate::shader::{LightUniform, Material};
+use crate::file_utils;
 
 pub struct GameState {
     pub cubes: Vec<Cube>,
@@ -28,11 +29,7 @@ impl GameState {
     pub fn new(level: &PathBuf) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
 
-        let mut dir = fs::read_dir(level).unwrap();
-        let file = dir.find(|f| {
-            f.as_ref().unwrap().file_name().to_str().unwrap().ends_with(".txt")
-        }).unwrap().unwrap().file_name();
-        let full_path = level.join(file);
+        let full_path = file_utils::get_level_file(level, ".txt");
         let map = Map::from_file(&full_path);
 
         let cubes = Self::starting_cubes(&map);

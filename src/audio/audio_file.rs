@@ -9,7 +9,7 @@ pub struct Wav {
 }
 
 impl Wav {
-    pub fn new(path: PathBuf) -> Self {
+    pub fn new(path: &PathBuf) -> Self {
         let mut file = OpenOptions::new()
             .read(true)
             .open(&path)
@@ -50,7 +50,7 @@ impl Wav {
             bits_per_sample = bits_per_sample,
             data_size = data_size,
             data_read = num,
-            audio_bytes = format!("{:?}", &sample_buffer[0..200]),
+            audio_bytes = format!("{:?}", &sample_buffer[0..20]),
             fsb = format!("{:?}", filesize_bytes),
             file_header = format!("{:?}", file_header),
             "open wav file",

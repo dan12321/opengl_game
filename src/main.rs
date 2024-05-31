@@ -7,6 +7,7 @@ mod shader;
 mod shape;
 mod state;
 mod audio;
+mod file_utils;
 
 extern crate glfw;
 extern crate image;
@@ -14,7 +15,7 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
-use std::time::Instant;
+use std::{path::PathBuf, time::Instant};
 
 use audio::Audio;
 use controller::{Button, Controller};
@@ -65,13 +66,18 @@ fn main() {
     }
 
     // Program Setup
-    let mut state = GameState::new(&"assets/maps/sad".into());
+    let level = "assets/maps/sad";
+    let mut state = GameState::new(&level.into());
     let mut last_status = state.status;
     let mut controller = Controller::new(&mut glfw, events);
     let renderer = Renderer::new(window_width, window_height);
-    let audio = Audio::new(&"assets/maps/sad".into());
+    let mut audio = Audio::new();
+    let level_song = file_utils::get_level_file(&level.into(), ".wav");
+    let song_track = audio.add_wav(&level_song);
+    let death_track = audio.add_wav(&"assets/sounds/test.wav".into());
 
     let mut last_time = Instant::now();
+    audio.track_action(audio::Action::Play(song_track));
     while !window.should_close() {
         window.swap_buffers();
 
@@ -91,8 +97,14 @@ fn main() {
         if state.status != last_status {
             match state.status {
                 Status::Alive => (),
-                Status::Dead => audio.collided(),
-                Status::Resetting => audio.reset(),
+                Status::Dead => {
+                    audio.track_action(audio::Action::Slow(song_track));
+                    audio.track_action(audio::Action::Play(death_track));
+                },
+                Status::Resetting => {
+                    audio.track_action(audio::Action::Reset(song_track));
+                    audio.track_action(audio::Action::Play(song_track));
+                },
             }
         }
         renderer.render(&state);

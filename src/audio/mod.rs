@@ -1,12 +1,15 @@
 mod audio_file;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::{fs, thread};
-use std::sync::mpsc::{Sender, Receiver};
-use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, RwLock};
+use std::thread;
 
+use cpal::SupportedStreamConfigRange;
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait}, Device, FromSample, Sample, SizedSample, StreamConfig, SupportedStreamConfig
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+    Device, FromSample, Sample, SizedSample, StreamConfig, SupportedStreamConfig,
 };
 
 use tracing::debug;
@@ -14,71 +17,77 @@ use tracing::debug;
 use self::audio_file::Wav;
 
 pub struct Audio {
-    sender: Sender<i32>,
+    sender: Sender<Action>,
+    track_list: Arc<RwLock<Vec<Wav>>>,
 }
 
 impl Audio {
-    pub fn new(level: &PathBuf) -> Self {
-        let mut dir = fs::read_dir(level).unwrap();
-        let file = dir.find(|f| {
-            f.as_ref().unwrap().file_name().to_str().unwrap().ends_with(".wav")
-        }).unwrap().unwrap().file_name();
-        let full_path = level.join(file);
-        let wav_files: [PathBuf; 2] = [full_path, "assets/sounds/test.wav".into()];
+    pub fn new() -> Self {
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         let device_name = device.name().unwrap();
 
-        let supported_config: Vec<_> = device.supported_output_configs().unwrap().into_iter().collect();
+        let supported_config: Vec<SupportedStreamConfigRange> = device
+            .supported_output_configs()
+            .unwrap()
+            .into_iter()
+            .collect();
         let config = device.default_output_config().unwrap();
-        debug!(device = device_name, configs = format!("{:?}", &supported_config), config = format!("{:?}", &config), "Output device");
+        debug!(
+            device = device_name,
+            configs = format!("{:?}", &supported_config),
+            config = format!("{:?}", &config),
+            "Output device"
+        );
 
-        let mut wavs: Vec<Wav> = Vec::with_capacity(wav_files.len());
-        for wav_file in wav_files {
-            let wav = audio_file::Wav::new(wav_file);
-            wavs.push(wav);
-        }
-        let (sender, receiver) = mpsc::channel();
-        sender.send(0).unwrap();
+        let wavs = Vec::new();
+        let track_list = Arc::new(RwLock::new(wavs));
+        let track_list_reader = track_list.clone();
+        let (sender, receiver) = mpsc::channel::<Action>();
 
         thread::spawn(move || {
-            let audio_thread = Mixer::new(
-                receiver,
-                wavs,
-            device,
-            config.into(),
-        );
+            let audio_thread = Mixer::new(receiver, track_list_reader, device, config.into());
             audio_thread.run();
         });
-        Audio {
-            sender,
-        }
+        Audio { sender, track_list }
     }
 
-    pub fn collided(&self) {
-        self.sender.send(1).unwrap();
+    pub fn add_wav(&mut self, filename: &PathBuf) -> usize {
+        let wav = audio_file::Wav::new(filename);
+        // TODO: Do this in a non blocking way
+        // since reads should only be holding the lock for <1ms and this thread
+        // only holds it for a push, waiting for the lock isn't too big of a concern
+        let mut track_list = self.track_list.write().unwrap();
+        let track_number = track_list.len();
+        track_list.push(wav);
+        track_number
     }
 
-    pub fn reset(&self) {
-        self.sender.send(2).unwrap();
+    pub fn track_action(&self, action: Action) {
+        self.sender.send(action).unwrap();
     }
 }
 
 impl Drop for Audio {
     fn drop(&mut self) {
-        self.sender.send(3).unwrap();
+        self.sender.send(Action::Cleanup).unwrap();
     }
 }
 
 struct Mixer {
     device: Device,
     config: SupportedStreamConfig,
-    receiver: Receiver<i32>,
-    wavs: Vec<Wav>,
+    receiver: Receiver<Action>,
+    wavs: Arc<RwLock<Vec<Wav>>>,
 }
 
 impl Mixer {
-    fn new(receiver: Receiver<i32>, wavs: Vec<Wav>, device: Device, config: SupportedStreamConfig) -> Self {
+    fn new(
+        receiver: Receiver<Action>,
+        wavs: Arc<RwLock<Vec<Wav>>>,
+        device: Device,
+        config: SupportedStreamConfig,
+    ) -> Self {
         Mixer {
             device,
             config,
@@ -89,21 +98,21 @@ impl Mixer {
 
     fn run(&self) {
         match self.config.sample_format() {
-            cpal::SampleFormat::I8 => self.play_sin::<i8>(),
-            cpal::SampleFormat::I16 => self.play_sin::<i16>(),
-            cpal::SampleFormat::I32 => self.play_sin::<i32>(),
-            cpal::SampleFormat::I64 => self.play_sin::<i64>(),
-            cpal::SampleFormat::U8 => self.play_sin::<u8>(),
-            cpal::SampleFormat::U16 => self.play_sin::<u16>(),
-            cpal::SampleFormat::U32 => self.play_sin::<u32>(),
-            cpal::SampleFormat::U64 => self.play_sin::<u64>(),
-            cpal::SampleFormat::F32 => self.play_sin::<f32>(),
-            cpal::SampleFormat::F64 => self.play_sin::<f64>(),
+            cpal::SampleFormat::I8 => self.play::<i8>(),
+            cpal::SampleFormat::I16 => self.play::<i16>(),
+            cpal::SampleFormat::I32 => self.play::<i32>(),
+            cpal::SampleFormat::I64 => self.play::<i64>(),
+            cpal::SampleFormat::U8 => self.play::<u8>(),
+            cpal::SampleFormat::U16 => self.play::<u16>(),
+            cpal::SampleFormat::U32 => self.play::<u32>(),
+            cpal::SampleFormat::U64 => self.play::<u64>(),
+            cpal::SampleFormat::F32 => self.play::<f32>(),
+            cpal::SampleFormat::F64 => self.play::<f64>(),
             sample_format => panic!("Unsupported sample format '{sample_format}'"),
         };
     }
 
-    fn play_sin<T>(&self)
+    fn play<T>(&self)
     where
         T: SizedSample + FromSample<f32>,
     {
@@ -112,76 +121,86 @@ impl Mixer {
         let seconds_per_sample = 1.0 / sample_rate;
         let channels = config.channels as usize;
 
-        let (sender, receiver) = mpsc::channel();
-        sender.send(0).unwrap();
-        let mut last = 0;
-        let mut death_wav_position = 0;
-        let mut music_wav_second = 0.0;
-        let death_wav = self.wavs[1].samples.clone();
-        let music_wav = self.wavs[0].samples.clone();
-        let music_sample_rate = self.wavs[0].sample_rate as f64;
-        debug!(wav = format!("{:?}", &death_wav[0..32]), "play");
+        let (sender, receiver) = mpsc::channel::<Action>();
+        let wavs = self.wavs.clone();
+        let mut tracks: HashMap<usize, Track> = HashMap::new();
         let mut next_value = move || {
-            let mut result = 0.0;
-            last = receiver.try_recv().unwrap_or(last);
-            if last == 2 {
-                music_wav_second = 0.0;
-                last = 0;
-            }
-
-            if last == 1 && death_wav_position < death_wav.len() {
-                let sample = death_wav[death_wav_position];
-                result += sample / 32_768.0;
-                death_wav_position += 1;
-            } else if last != 1 {
-                death_wav_position = 0;
-            }
-
-            let raw_index = music_wav_second * music_sample_rate;
-            let limit = music_wav.len();
-            let lower_index = raw_index.floor();
-            let upper_index = raw_index.ceil();
-            let dist_to_lower = raw_index - lower_index;
-            let lower = music_wav[lower_index as usize % limit];
-            let upper = music_wav[upper_index as usize % limit];
-            let music_sample = upper * dist_to_lower + lower * (1.0 - dist_to_lower);
-            let music_wav_step = if last == 1 {
-                seconds_per_sample * 0.9
-            } else {
-                seconds_per_sample
-            };
-            music_wav_second += music_wav_step;
-            result += music_sample / 32_768.0;
-
-            // music_wav_second as f32 caused varying rate so use f64 and
-            // convert to f32 at the end
-            result as f32
+            Self::get_next_audio_value(&wavs, &receiver, &mut tracks, &seconds_per_sample)
         };
-    
+
         let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
-    
-        let stream = self.device.build_output_stream(
-            &config.into(),
-            move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-                write_data(data, channels, &mut next_value)
-            },
-            err_fn,
-            None,
-        ).unwrap();
+
+        let stream = self
+            .device
+            .build_output_stream(
+                &config.into(),
+                move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
+                    write_data(data, channels, &mut next_value)
+                },
+                err_fn,
+                None,
+            )
+            .unwrap();
 
         stream.play().unwrap();
-    
+
         let mut last_message = self.receiver.recv().unwrap();
-        while last_message != 3 {
-            debug!(last_message = last_message, "last audio message");
-            if last_message == 1 {
-                sender.send(1).unwrap();
-            }
-            if last_message == 2 {
-                sender.send(2).unwrap();
-            }
+        while last_message != Action::Cleanup {
+            debug!(
+                last_message = format!("{:?}", last_message),
+                "last audio message"
+            );
+            sender.send(last_message).unwrap();
             last_message = self.receiver.recv().unwrap();
         }
+    }
+
+    fn get_next_audio_value(
+        wavs: &Arc<RwLock<Vec<Wav>>>,
+        receiver: &Receiver<Action>,
+        tracks: &mut HashMap<usize, Track>,
+        seconds_per_sample: &f64,
+    ) -> f32 {
+        let wav_read = wavs.read().unwrap();
+        while let Ok(action) = receiver.try_recv() {
+            update_track_state(tracks, &action);
+        }
+        let mut result = 0.0;
+        for i in 0..wav_read.len() {
+            if let Some(track) = tracks.get_mut(&i) {
+                if track.state == TrackState::Playing || track.state == TrackState::Slow {
+                    let samples = &wav_read[i].samples;
+                    let track_sample_rate = wav_read[i].sample_rate as f64;
+                    let raw_index = track.time * track_sample_rate as f64;
+                    let limit = samples.len();
+                    let lower_index = raw_index.floor();
+                    let upper_index = raw_index.ceil();
+                    let dist_to_lower = raw_index - lower_index;
+                    if upper_index as usize >= samples.len() {
+                        track.state = TrackState::Stopped;
+                        track.time = 0.0;
+                        continue;
+                    }
+                    let lower = samples[lower_index as usize % limit];
+                    let upper = samples[upper_index as usize % limit];
+                    let sample = upper * dist_to_lower + lower * (1.0 - dist_to_lower);
+                    result += sample / 32_768.0;
+
+                    let sample_step = if track.state == TrackState::Slow {
+                        seconds_per_sample * 0.9
+                    } else {
+                        *seconds_per_sample
+                    };
+                    track.time += sample_step;
+                }
+            }
+        }
+
+        // music_wav_second as f32 caused varying rate so use f64 and
+        // convert to f32 at the end. If f64 precision still leads to noticeable
+        // drift on longer tracks this will need refactoring to not use
+        // floats for time calculations
+        result as f32
     }
 }
 
@@ -194,5 +213,77 @@ where
         for sample in frame.iter_mut() {
             *sample = value;
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Action {
+    Play(usize),
+    Stop(usize),
+    Reset(usize),
+    Slow(usize),
+    Cleanup,
+}
+
+struct Track {
+    state: TrackState,
+    time: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum TrackState {
+    Playing,
+    Stopped,
+    Slow,
+}
+
+fn update_track_state(tracks: &mut HashMap<usize, Track>, action: &Action) {
+    match action {
+        Action::Reset(track) => {
+            tracks.insert(
+                *track,
+                Track {
+                    state: TrackState::Stopped,
+                    time: 0.0,
+                },
+            );
+        }
+        Action::Play(track) => match tracks.get_mut(track) {
+            Some(t) => t.state = TrackState::Playing,
+            None => {
+                tracks.insert(
+                    *track,
+                    Track {
+                        time: 0.0,
+                        state: TrackState::Playing,
+                    },
+                );
+            }
+        },
+        Action::Slow(track) => match tracks.get_mut(track) {
+            Some(t) => t.state = TrackState::Slow,
+            None => {
+                tracks.insert(
+                    *track,
+                    Track {
+                        time: 0.0,
+                        state: TrackState::Slow,
+                    },
+                );
+            }
+        },
+        Action::Stop(track) => match tracks.get_mut(track) {
+            Some(t) => t.state = TrackState::Stopped,
+            None => {
+                tracks.insert(
+                    *track,
+                    Track {
+                        time: 0.0,
+                        state: TrackState::Stopped,
+                    },
+                );
+            }
+        },
+        Action::Cleanup => (),
     }
 }
