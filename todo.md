@@ -34,7 +34,7 @@
 - [ ] Control/feel
   - [X] Fix bug in position update (sometimes flashes in old position)
     - Was due to linear interpolation calculation
-  - [ ] Add input buffer
+  - [ ] Add input buffer (not sure needed yet)
 - [ ] Gameplay
   - [X] Add death state
     - Add audio effect to music like slow down
