@@ -10,7 +10,7 @@ use image::DynamicImage;
 use na::Matrix4;
 
 use crate::{
-    shader::{create_shader, template_light, LightUniform, OpenGLError, Prop},
+    shader::{create_shader, template_dir_light, template_point_light, DirLight, DirLightProp, OpenGLError, PointLightProp, PointLight as PointLight},
     state::{Plane, XYZ},
 };
 
@@ -23,17 +23,25 @@ pub struct PlaneRenderer {
     camera_position_uniform: i32,
     transformation_uniform: i32,
     material_uniform: MaterialUniform,
-    light_uniform: [SpotLightUniform; MAX_LIGHTS],
+    point_light_uniform: [PointLightUniform; MAX_LIGHTS],
+    dir_light_uniform: [DirLightUniform; MAX_LIGHTS],
     offset_uniform: i32,
     indices: Vec<u32>,
 }
 
 #[derive(Copy, Clone, Debug)]
-struct SpotLightUniform {
+struct PointLightUniform {
     position: i32,
     diffuse: i32,
     specular: i32,
     strength: i32,
+}
+
+#[derive(Copy, Clone, Debug)]
+struct DirLightUniform {
+    direction: i32,
+    diffuse: i32,
+    specular: i32,
 }
 
 struct MaterialUniform {
@@ -141,26 +149,44 @@ impl PlaneRenderer {
             let transformation_uniform = gl::GetUniformLocation(program, TRANSFORMATION.as_ptr());
             let offset_uniform = gl::GetUniformLocation(program, OFFSET.as_ptr());
 
-            let mut lights = [SpotLightUniform {
+            let mut point_lights = [PointLightUniform {
                 position: -1,
                 diffuse: -1,
                 specular: -1,
                 strength: -1,
             }; MAX_LIGHTS];
             for i in 0..MAX_LIGHTS {
-                let pos = template_light(i, Prop::Position);
-                let dif = template_light(i, Prop::Diffuse);
-                let spec = template_light(i, Prop::Specular);
-                let stren = template_light(i, Prop::Strength);
+                let pos = template_point_light(i, PointLightProp::Position);
+                let dif = template_point_light(i, PointLightProp::Diffuse);
+                let spec = template_point_light(i, PointLightProp::Specular);
+                let stren = template_point_light(i, PointLightProp::Strength);
                 let position = CString::new(pos.as_bytes()).unwrap();
                 let diffuse = CString::new(dif.as_bytes()).unwrap();
                 let specular = CString::new(spec.as_bytes()).unwrap();
                 let strength = CString::new(stren.as_bytes()).unwrap();
-                lights[i] = SpotLightUniform {
+                point_lights[i] = PointLightUniform {
                     position: gl::GetUniformLocation(program, position.as_ptr()),
                     diffuse: gl::GetUniformLocation(program, diffuse.as_ptr()),
                     specular: gl::GetUniformLocation(program, specular.as_ptr()),
                     strength: gl::GetUniformLocation(program, strength.as_ptr()),
+                };
+            }
+            let mut dir_lights = [DirLightUniform {
+                direction: -1,
+                diffuse: -1,
+                specular: -1,
+            }; MAX_LIGHTS];
+            for i in 0..MAX_LIGHTS {
+                let dir = template_dir_light(i, DirLightProp::Direction);
+                let dif = template_dir_light(i, DirLightProp::Diffuse);
+                let spec = template_dir_light(i, DirLightProp::Specular);
+                let direction = CString::new(dir.as_bytes()).unwrap();
+                let diffuse = CString::new(dif.as_bytes()).unwrap();
+                let specular = CString::new(spec.as_bytes()).unwrap();
+                dir_lights[i] = DirLightUniform {
+                    direction: gl::GetUniformLocation(program, direction.as_ptr()),
+                    diffuse: gl::GetUniformLocation(program, diffuse.as_ptr()),
+                    specular: gl::GetUniformLocation(program, specular.as_ptr()),
                 };
             }
             Ok(Self {
@@ -173,7 +199,8 @@ impl PlaneRenderer {
                 projection_uniform,
                 view_uniform,
                 transformation_uniform,
-                light_uniform: lights,
+                point_light_uniform: point_lights,
+                dir_light_uniform: dir_lights,
                 offset_uniform,
             })
         }
@@ -182,7 +209,8 @@ impl PlaneRenderer {
     pub fn draw(
         &self,
         planes: &[Plane],
-        lights: &[LightUniform],
+        point_lights: &[PointLight],
+        dir_lights: &[DirLight],
         camera_position: &XYZ,
         view: Matrix4<f32>,
         projection: Matrix4<f32>,
@@ -199,26 +227,46 @@ impl PlaneRenderer {
                 &self.indices[0] as *const _ as *const c_void,
                 gl::STATIC_DRAW,
             );
-            for i in 0..lights.len() {
+            for i in 0..point_lights.len() {
                 gl::Uniform3f(
-                    self.light_uniform[i].position,
-                    lights[i].position.0,
-                    lights[i].position.1,
-                    lights[i].position.2,
+                    self.point_light_uniform[i].position,
+                    point_lights[i].position.0,
+                    point_lights[i].position.1,
+                    point_lights[i].position.2,
                 );
                 gl::Uniform3f(
-                    self.light_uniform[i].diffuse,
-                    lights[i].diffuse.0,
-                    lights[i].diffuse.1,
-                    lights[i].diffuse.2,
+                    self.point_light_uniform[i].diffuse,
+                    point_lights[i].diffuse.0,
+                    point_lights[i].diffuse.1,
+                    point_lights[i].diffuse.2,
                 );
                 gl::Uniform3f(
-                    self.light_uniform[i].specular,
-                    lights[i].specular.0,
-                    lights[i].specular.1,
-                    lights[i].specular.2,
+                    self.point_light_uniform[i].specular,
+                    point_lights[i].specular.0,
+                    point_lights[i].specular.1,
+                    point_lights[i].specular.2,
                 );
-                gl::Uniform1f(self.light_uniform[i].strength, lights[i].strength);
+                gl::Uniform1f(self.point_light_uniform[i].strength, point_lights[i].strength);
+            }
+            for i in 0..dir_lights.len() {
+                gl::Uniform3f(
+                    self.dir_light_uniform[i].direction,
+                    dir_lights[i].direction.0,
+                    dir_lights[i].direction.1,
+                    dir_lights[i].direction.2,
+                );
+                gl::Uniform3f(
+                    self.dir_light_uniform[i].diffuse,
+                    dir_lights[i].diffuse.0,
+                    dir_lights[i].diffuse.1,
+                    dir_lights[i].diffuse.2,
+                );
+                gl::Uniform3f(
+                    self.dir_light_uniform[i].specular,
+                    dir_lights[i].specular.0,
+                    dir_lights[i].specular.1,
+                    dir_lights[i].specular.2,
+                );
             }
             gl::UniformMatrix4fv(self.view_uniform, 1, gl::FALSE, view.as_ptr());
             gl::UniformMatrix4fv(self.projection_uniform, 1, gl::FALSE, projection.as_ptr());

@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use std::ptr;
 
 use crate::shader::{create_shader, OpenGLError};
-use crate::state::Light;
+use crate::state::PointLight;
 
 use gl;
 use gl::types::*;
 use na::Matrix4;
 
-pub struct SpotLightRenderer {
+pub struct PointLightRenderer {
     shader_id: u32,
     vao: u32,
     color_uniform: i32,
@@ -20,7 +20,7 @@ pub struct SpotLightRenderer {
     indices: Vec<u32>,
 }
 
-impl SpotLightRenderer {
+impl PointLightRenderer {
     pub fn new(
         vert_shader: &PathBuf,
         frag_shader: &PathBuf,
@@ -100,7 +100,7 @@ impl SpotLightRenderer {
         }
     }
 
-    pub fn draw(&self, lights: &[Light], view: Matrix4<f32>, projection: Matrix4<f32>) {
+    pub fn draw(&self, lights: &[PointLight], view: Matrix4<f32>, projection: Matrix4<f32>) {
         unsafe {
             gl::UseProgram(self.shader_id);
             gl::BindVertexArray(self.vao);

@@ -1,6 +1,6 @@
 mod cube_renderer;
 mod plane_renderer;
-mod spot_light_renderer;
+mod point_light_renderer;
 
 use std::f32::consts::PI;
 use std::path::PathBuf;
@@ -10,9 +10,9 @@ use gl;
 use gl::types::*;
 use na::Perspective3;
 use plane_renderer::PlaneRenderer;
-use spot_light_renderer::SpotLightRenderer;
+use point_light_renderer::PointLightRenderer;
 
-use crate::shader::LightUniform;
+use crate::shader::PointLight;
 use crate::state::GameState;
 
 use super::config::{
@@ -25,7 +25,7 @@ use super::shape::{
 };
 
 pub struct Renderer {
-    light: SpotLightRenderer,
+    light: PointLightRenderer,
     cube: CubeRenderer,
     plane: PlaneRenderer,
     projection: Perspective3<GLfloat>,
@@ -41,7 +41,7 @@ impl Renderer {
 
         let light_vert_shader = PathBuf::from(LIGHT_VERT_SHADER);
         let light_frag_shader = PathBuf::from(LIGHT_FRAG_SHADER);
-        let light = SpotLightRenderer::new(
+        let light = PointLightRenderer::new(
             &light_vert_shader,
             &light_frag_shader,
             &CUBE_VERTICES,
@@ -83,13 +83,14 @@ impl Renderer {
     pub fn render(&self, state: &GameState) {
         clear();
         let view = state.camera.transform();
-        let light_uniforms: Vec<LightUniform> =
-            state.lights.iter().map(|l| l.as_light_uniforms()).collect();
+        let light_uniforms: Vec<PointLight> =
+            state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
         self.light
-            .draw(&state.lights, view, self.projection.as_matrix().clone());
+            .draw(&state.point_lights, view, self.projection.as_matrix().clone());
         self.cube.draw(
             &state.cubes,
             &light_uniforms,
+            &state.dir_lights,
             &state.camera.position().into(),
             view,
             self.projection.as_matrix().clone(),
@@ -97,6 +98,7 @@ impl Renderer {
         self.cube.draw(
             &[state.player.cube],
             &light_uniforms,
+            &state.dir_lights,
             &state.camera.position().into(),
             view,
             self.projection.as_matrix().clone(),
@@ -105,6 +107,7 @@ impl Renderer {
         self.plane.draw(
             &[state.plane],
             &light_uniforms,
+            &state.dir_lights,
             &state.camera.position().into(),
             view,
             self.projection.as_matrix().clone(),

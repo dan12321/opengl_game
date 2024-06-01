@@ -71,27 +71,49 @@ pub struct Material {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct LightUniform {
+pub struct PointLight {
     pub position: (GLfloat, GLfloat, GLfloat),
     pub diffuse: (GLfloat, GLfloat, GLfloat),
     pub specular: (GLfloat, GLfloat, GLfloat),
     pub strength: GLfloat,
 }
 
-pub fn template_light(index: usize, prop: Prop) -> String {
+pub fn template_point_light(index: usize, prop: PointLightProp) -> String {
     let property = match prop {
-        Prop::Position => "position",
-        Prop::Diffuse => "diffuse",
-        Prop::Specular => "specular",
-        Prop::Strength => "strength",
+        PointLightProp::Position => "position",
+        PointLightProp::Diffuse => "diffuse",
+        PointLightProp::Specular => "specular",
+        PointLightProp::Strength => "strength",
     };
 
     format!("pointLights[{}].{}", index, property)
 }
 
-pub enum Prop {
+pub enum PointLightProp {
     Position,
     Diffuse,
     Specular,
     Strength,
+}
+
+pub struct DirLight {
+    pub direction: (GLfloat, GLfloat, GLfloat),
+    pub diffuse: (GLfloat, GLfloat, GLfloat),
+    pub specular: (GLfloat, GLfloat, GLfloat),
+}
+
+pub fn template_dir_light(index: usize, prop: DirLightProp) -> String {
+    let property = match prop {
+        DirLightProp::Direction => "direction",
+        DirLightProp::Diffuse => "diffuse",
+        DirLightProp::Specular => "specular",
+    };
+
+    format!("pointLights[{}].{}", index, property)
+}
+
+pub enum DirLightProp {
+    Direction,
+    Diffuse,
+    Specular,
 }

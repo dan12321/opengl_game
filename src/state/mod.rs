@@ -9,13 +9,14 @@ use na::{vector, Matrix4, Rotation3};
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
-use crate::file_utils;
+use crate::{file_utils, shader};
 use crate::physics::AABBColider;
-use crate::shader::{LightUniform, Material};
+use crate::shader::{DirLight, Material};
 
 pub struct GameState {
     pub cubes: Vec<Cube>,
-    pub lights: Vec<Light>,
+    pub point_lights: Vec<PointLight>,
+    pub dir_lights: Vec<DirLight>,
     pub player: Player,
     speed: f32,
     pub plane: Plane,
@@ -37,7 +38,14 @@ impl GameState {
         GameState {
             camera,
             cubes,
-            lights,
+            point_lights: lights,
+            dir_lights: vec![
+                DirLight {
+                    direction: (0.0, 0.9, -0.4),
+                    diffuse: (0.0, 0.0, 1.0),
+                    specular: (0.0, 0.0, 1.0),
+                }
+            ],
             player: Player {
                 target_lane: 1,
                 current_lane: 1,
@@ -83,7 +91,7 @@ impl GameState {
         let x = controller.direction();
 
         // lights update
-        for light in &mut self.lights {
+        for light in &mut self.point_lights {
             if light.transform.position.z > 50.0 {
                 light.transform.position.z = -90.0;
             }
@@ -153,7 +161,7 @@ impl GameState {
         let displacement = speed_ratio * self.speed * dt;
 
         // lights update
-        for light in &mut self.lights {
+        for light in &mut self.point_lights {
             if light.transform.position.z > 50.0 {
                 light.transform.position.z = -90.0;
             }
@@ -181,7 +189,7 @@ impl GameState {
     }
 
     fn resetting_update(&mut self) -> Status {
-        self.lights = Self::starting_lights();
+        self.point_lights = Self::starting_lights();
         self.cubes = Self::starting_cubes(&self.map);
         self.player.cube.transform.position.x = 0.0;
         self.player.cube.transform.position.z = 0.0;
@@ -190,7 +198,7 @@ impl GameState {
         Status::Alive
     }
 
-    fn starting_lights() -> Vec<Light> {
+    fn starting_lights() -> Vec<PointLight> {
         let mut lights = Vec::with_capacity(64);
         for i in 0..=4 {
             let n = i as f32;
@@ -211,21 +219,21 @@ impl GameState {
                 scale: (0.5, 0.5, 0.5).into(),
                 rotation: Matrix4::identity(),
             };
-            let light1 = Light {
+            let light1 = PointLight {
                 transform: light1_transform,
-                diffuse: (1.0, 1.0, 1.0),
+                diffuse: (0.0, 0.0, 0.0),
                 specular: (1.0, 1.0, 1.0),
                 strength: 10.0,
             };
-            let light2 = Light {
+            let light2 = PointLight {
                 transform: light2_transform,
-                diffuse: (1.0, 1.0, 1.0),
+                diffuse: (0.0, 0.0, 0.0),
                 specular: (1.0, 1.0, 1.0),
                 strength: 10.0,
             };
-            let light3 = Light {
+            let light3 = PointLight {
                 transform: light3_transform,
-                diffuse: (1.0, 1.0, 1.0),
+                diffuse: (0.0, 0.0, 0.0),
                 specular: (1.0, 1.0, 1.0),
                 strength: 10.0,
             };
@@ -291,17 +299,17 @@ pub struct Plane {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Light {
+pub struct PointLight {
     pub transform: Transform,
     pub diffuse: (f32, f32, f32),
     pub specular: (f32, f32, f32),
     pub strength: f32,
 }
 
-impl Light {
-    pub fn as_light_uniforms(&self) -> LightUniform {
+impl PointLight {
+    pub fn as_light_uniforms(&self) -> shader::PointLight {
         let pos = self.transform.position;
-        LightUniform {
+        shader::PointLight {
             position: (pos.x, pos.y, pos.z),
             diffuse: self.diffuse,
             specular: self.specular,
@@ -351,8 +359,8 @@ impl Transform {
 }
 
 pub static PLAYER_MATERIAL: Material = Material {
-    ambient: (0.3, 0.3, 0.3),
-    diffuse: (0.6, 0.7, 0.9),
+    ambient: (0.0, 0.0, 0.0),
+    diffuse: (0.5, 0.5, 0.5),
     specular: (0.7, 0.7, 0.7),
     shininess: 8,
 };

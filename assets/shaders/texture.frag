@@ -13,6 +13,12 @@ struct PointLight {
     float strength;
 };
 
+struct DirLight {
+    vec3 direction;
+    vec3 diffuse;
+    vec3 specular;
+};
+
 in vec2 TexCoord;
 in vec3 FragPos;
 in vec3 Normal;
@@ -23,11 +29,14 @@ uniform Material material;
 uniform float offset;
 
 #define NR_POINT_LIGHTS 64
+#define NR_DIR_LIGHTS 64
 uniform PointLight pointLights[NR_POINT_LIGHTS];
+uniform DirLight dirLights[NR_DIR_LIGHTS];
 
 out vec4 FragColor;
 
 vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir);
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 fragPos, vec3 cameraDir);
 void main()
 {
     vec2 texCoord = vec2(TexCoord.x, TexCoord.y + offset);
@@ -37,6 +46,10 @@ void main()
     vec3 color = material.ambient;
     for (int i = 0; i < NR_POINT_LIGHTS; i++) {
         color += CalcPointLight(pointLights[i], Normal, FragPos, cameraDir);
+    }
+
+    for (int i = 0; i < NR_DIR_LIGHTS; i++) {
+        color += CalcDirLight(dirLights[i], Normal, FragPos, cameraDir);
     }
 
     FragColor = vec4(color, 1.0) * tex;
@@ -53,6 +66,18 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir)
 
     vec3 reflectDir = reflect(-lightDir, normal);
     float specularIntensity = distanceFallOff * pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
+    vec3 specular = specularIntensity * light.specular * material.specular;
+
+    return specular + diffuse;
+}
+
+vec3 CalcDirLight(DirLight light, vec3 normal, vec3 fragPos, vec3 cameraDir)
+{
+    float diffuseIntensity = max(dot(normal, light.direction), 0.0);
+    vec3 diffuse = diffuseIntensity * material.diffuse * light.diffuse;
+
+    vec3 reflectDir = reflect(-light.direction, normal);
+    float specularIntensity = pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
     vec3 specular = specularIntensity * light.specular * material.specular;
 
     return specular + diffuse;
