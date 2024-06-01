@@ -39,3 +39,4 @@
     - Wait for input and restart song
 - [ ] Misc
   - [ ] Replace unwraps with proper error handling
+  - [ ] Look into porting to android
