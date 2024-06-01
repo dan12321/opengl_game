@@ -18,6 +18,8 @@ pub struct Controller<'a> {
 pub enum Button {
     Restart,
     Quit,
+    Level1,
+    Level2,
 }
 
 impl<'a> Controller<'a> {
@@ -41,18 +43,24 @@ impl<'a> Controller<'a> {
             match event {
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     buttons.push(Button::Quit);
-                }
+                },
+                WindowEvent::Key(Key::Num1, _, Action::Press, _) => {
+                    buttons.push(Button::Level1);
+                },
+                WindowEvent::Key(Key::Num2, _, Action::Press, _) => {
+                    buttons.push(Button::Level2);
+                },
                 WindowEvent::Key(Key::R, _, Action::Press, _) => {
                     buttons.push(Button::Restart);
-                }
+                },
                 WindowEvent::Key(Key::Right, _, Action::Press, _) => {
                     self.direction_x = 1.0;
                     x_set = true;
-                }
+                },
                 WindowEvent::Key(Key::Left, _, Action::Press, _) => {
                     self.direction_x = -1.0;
                     x_set = true;
-                }
+                },
                 WindowEvent::CursorPos(x, y) => {
                     let x = x as f32;
                     let y = y as f32;
@@ -67,7 +75,7 @@ impl<'a> Controller<'a> {
                     self.camera_x = x;
                     self.camera_y = cy_clamped;
                     window.set_cursor_pos(self.camera_x as f64, self.camera_y as f64);
-                }
+                },
                 WindowEvent::Scroll(_, y) => {
                     let zoom = self.zoom - (y as f32 * SCROLL_ZOOM_SCALE);
                     let clamp_min = if zoom > MIN_ZOOM { zoom } else { MIN_ZOOM };
@@ -77,7 +85,7 @@ impl<'a> Controller<'a> {
                         MAX_ZOOM
                     };
                     self.zoom = clamp as f32;
-                }
+                },
                 _ => (),
             }
         }

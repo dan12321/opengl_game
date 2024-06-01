@@ -25,6 +25,10 @@
 - [ ] Misc
   - [ ] Add menus
   - [ ] Add scenes
+    - [X] Change map with buttons (currently hacky)
+    - [ ] Use a stack like structure where scene resources can be popped off and
+          push on the resources for the next scene
+    - [ ] Add loading screen and reset time
   - [ ] Fix bug in position update (sometimes flashes in old position)
   - [ ] Replace unwraps with proper error handling
   - [ ] Read map from file

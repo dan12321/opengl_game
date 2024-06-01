@@ -66,29 +66,62 @@ fn main() {
     }
 
     // Program Setup
-    let level = "assets/maps/sad";
-    let mut state = GameState::new(&level.into());
+    let sad_level = "assets/maps/sad";
+    let mut state = GameState::new(&sad_level.into());
     let mut last_status = state.status;
     let mut controller = Controller::new(&mut glfw, events);
     let renderer = Renderer::new(window_width, window_height);
     let mut audio = Audio::new();
-    let level_song = file_utils::get_level_file(&level.into(), ".wav");
-    let song_track = audio.add_wav(&level_song);
+    let sad_level_song = file_utils::get_level_file(&sad_level.into(), ".wav");
     let death_track = audio.add_wav(&"assets/sounds/test.wav".into());
+    let sad_song_track = audio.add_wav(&sad_level_song);
+    let upbeat_level = "assets/maps/upbeat";
+    let upbeat_level_song = file_utils::get_level_file(&upbeat_level.into(), ".wav");
+    let mut upbeat_track: Option<usize> = None;
+    let mut current_track = sad_song_track;
 
     let mut last_time = Instant::now();
-    audio.track_action(audio::Action::Play(song_track));
+    audio.track_action(audio::Action::Play(sad_song_track));
     while !window.should_close() {
         window.swap_buffers();
 
-        let current_time = Instant::now();
-        let delta_time = current_time.duration_since(last_time);
+        let mut current_time = Instant::now();
+        let mut delta_time = current_time.duration_since(last_time);
         last_time = current_time;
 
         controller.poll_input(&mut window);
         for button in controller.buttons() {
             match button {
                 Button::Quit => window.set_should_close(true),
+                Button::Level1 => {
+                    state = GameState::new(&sad_level.into());
+                    match upbeat_track {
+                        Some(track) => {
+                            audio.track_action(audio::Action::Stop(track));
+                        },
+                        None => (),
+                    }
+                    current_track = sad_song_track;
+                    audio.track_action(audio::Action::Play(sad_song_track));
+                },
+                Button::Level2 => {
+                    state = GameState::new(&upbeat_level.into());
+                    audio.track_action(audio::Action::Stop(sad_song_track));
+                    let track = match upbeat_track {
+                        Some(t) => t,
+                        None => {
+                            let t = audio.add_wav(&upbeat_level_song);
+                            upbeat_track = Some(t);
+                            t
+                        },
+                    };
+                    last_time = Instant::now();
+                    current_time = Instant::now();
+                    delta_time = current_time.duration_since(last_time);
+                    last_time = current_time;
+                    current_track = track;
+                    audio.track_action(audio::Action::Play(track));
+                },
                 _ => (),
             }
         }
@@ -98,12 +131,12 @@ fn main() {
             match state.status {
                 Status::Alive => (),
                 Status::Dead => {
-                    audio.track_action(audio::Action::Slow(song_track));
+                    audio.track_action(audio::Action::Slow(current_track));
                     audio.track_action(audio::Action::Play(death_track));
                 }
                 Status::Resetting => {
-                    audio.track_action(audio::Action::Reset(song_track));
-                    audio.track_action(audio::Action::Play(song_track));
+                    audio.track_action(audio::Action::Reset(current_track));
+                    audio.track_action(audio::Action::Play(current_track));
                 }
             }
         }
