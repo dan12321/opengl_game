@@ -5,6 +5,7 @@
   - [ ] Bloom
   - [ ] Directional Lighting
   - [ ] Shadows
+  - [ ] Replace temp textures
 - [ ] Audio Engine
   - [X] [cpal](https://github.com/RustAudio/cpal) low level cross platform
     - Can build output stream react to inputs?
