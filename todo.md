@@ -3,7 +3,7 @@
 - [ ] Graphics
   - [ ] Skybox
   - [ ] Bloom
-  - [ ] Directional Lighting
+  - [X] Directional Lighting
   - [ ] Shadows
   - [ ] Replace temp textures
 - [ ] Audio Engine
@@ -42,6 +42,7 @@
   - [X] Add death state
     - Add audio effect to music like slow down
     - Wait for input and restart song
+  - [ ] Move camera slightly with movement
 - [ ] Misc
   - [ ] Replace unwraps with proper error handling
   - [ ] Look into porting to android
