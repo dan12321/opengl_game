@@ -35,6 +35,9 @@
   - [X] Fix bug in position update (sometimes flashes in old position)
     - Was due to linear interpolation calculation
   - [ ] Add input buffer (not sure needed yet)
+  - [ ] Adjust the linear interpolate time based on gaps between beets. Currently
+        hard to leave late enough to not hit beat in next lane while not hitting
+        current lane
 - [ ] Gameplay
   - [X] Add death state
     - Add audio effect to music like slow down
