@@ -20,18 +20,22 @@
     - Increased precision of time variables to f64. Still slight drift between
       wav time and measured time but the rate of rate no longer changes (solving pitch).
   - [ ] Add stereo support
-  - [ ] Refactor to not use magic numbers
-    - Should also distinguish one of events from current status
-- [ ] Misc
+  - [X] Refactor to not use magic numbers
+- [ ] Scene stuff
   - [ ] Add menus
   - [ ] Add scenes
     - [X] Change map with buttons (currently hacky)
     - [ ] Use a stack like structure where scene resources can be popped off and
           push on the resources for the next scene
     - [ ] Add loading screen and reset time
+  - [X] Read map from file
+  - [ ] Add beet offset to map file 
+- [ ] Control/feel
   - [ ] Fix bug in position update (sometimes flashes in old position)
-  - [ ] Replace unwraps with proper error handling
-  - [ ] Read map from file
+  - [ ] Add input buffer
+- [ ] Gameplay
   - [X] Add death state
     - Add audio effect to music like slow down
     - Wait for input and restart song
+- [ ] Misc
+  - [ ] Replace unwraps with proper error handling
