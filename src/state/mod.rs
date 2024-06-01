@@ -240,7 +240,7 @@ impl GameState {
             let (l, m, r) = map.beats[i];
             // Amount to shift so beat is when the user show press
             // TODO: Figure out extra padding from sub divisions and speeds
-            let padding = -(3.0 + i as f32) * BEAT_SIZE;
+            let padding = -(map.start_offset + i as f32) * BEAT_SIZE;
             if l {
                 cubes.push(Cube {
                     transform: Transform {

@@ -3,6 +3,7 @@ use std::{fs::OpenOptions, io::Read, path::PathBuf};
 pub struct Map {
     pub bpm: f32,
     pub subdivisions: f32,
+    pub start_offset: f32,
     pub beats: Vec<(bool, bool, bool)>,
 }
 
@@ -20,6 +21,7 @@ impl Map {
         Map {
             bpm: metadata_parts[0],
             subdivisions: metadata_parts[1],
+            start_offset: metadata_parts[2],
             beats,
         }
     }
