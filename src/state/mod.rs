@@ -41,9 +41,9 @@ impl GameState {
             point_lights: lights,
             dir_lights: vec![
                 DirLight {
-                    direction: (0.0, 0.9, -0.4),
-                    diffuse: (0.0, 0.0, 1.0),
-                    specular: (0.0, 0.0, 1.0),
+                    direction: (0.316227, 0.95, 0.3),
+                    diffuse: (0.75, 0.95, 1.0),
+                    specular: (0.6, 0.6, 0.6),
                 }
             ],
             player: Player {
@@ -221,20 +221,20 @@ impl GameState {
             };
             let light1 = PointLight {
                 transform: light1_transform,
-                diffuse: (0.0, 0.0, 0.0),
-                specular: (1.0, 1.0, 1.0),
+                diffuse: (1.0, 1.0, 0.75),
+                specular: (1.0, 1.0, 0.75),
                 strength: 10.0,
             };
             let light2 = PointLight {
                 transform: light2_transform,
-                diffuse: (0.0, 0.0, 0.0),
-                specular: (1.0, 1.0, 1.0),
+                diffuse: (1.0, 1.0, 0.75),
+                specular: (1.0, 1.0, 0.75),
                 strength: 10.0,
             };
             let light3 = PointLight {
                 transform: light3_transform,
-                diffuse: (0.0, 0.0, 0.0),
-                specular: (1.0, 1.0, 1.0),
+                diffuse: (1.0, 1.0, 0.75),
+                specular: (1.0, 1.0, 0.75),
                 strength: 10.0,
             };
             lights.push(light1);
@@ -359,7 +359,7 @@ impl Transform {
 }
 
 pub static PLAYER_MATERIAL: Material = Material {
-    ambient: (0.0, 0.0, 0.0),
+    ambient: (0.1, 0.1, 0.1),
     diffuse: (0.5, 0.5, 0.5),
     specular: (0.7, 0.7, 0.7),
     shininess: 8,

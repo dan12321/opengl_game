@@ -96,6 +96,7 @@ pub enum PointLightProp {
     Strength,
 }
 
+#[derive(Debug)]
 pub struct DirLight {
     pub direction: (GLfloat, GLfloat, GLfloat),
     pub diffuse: (GLfloat, GLfloat, GLfloat),
@@ -109,7 +110,7 @@ pub fn template_dir_light(index: usize, prop: DirLightProp) -> String {
         DirLightProp::Specular => "specular",
     };
 
-    format!("pointLights[{}].{}", index, property)
+    format!("dirLights[{}].{}", index, property)
 }
 
 pub enum DirLightProp {
