@@ -32,7 +32,8 @@
   - [X] Read map from file
   - [ ] Add beet offset to map file 
 - [ ] Control/feel
-  - [ ] Fix bug in position update (sometimes flashes in old position)
+  - [X] Fix bug in position update (sometimes flashes in old position)
+    - Was due to linear interpolation calculation
   - [ ] Add input buffer
 - [ ] Gameplay
   - [X] Add death state

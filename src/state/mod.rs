@@ -96,20 +96,23 @@ impl GameState {
         }
 
         // player update
-        if self.player.lerp > 0.999 {
+        if self.player.lerp >= 1.0 {
             // TODO add some leaway so a double tap moves two lanes
             if x > 0.0 && self.player.target_lane < 2 {
                 self.player.current_lane = self.player.target_lane;
                 self.player.target_lane += 1;
-                self.player.lerp = 1.0 - self.player.lerp;
+                self.player.lerp = 0.0;
             } else if x < 0.0 && self.player.target_lane > 0 {
                 self.player.current_lane = self.player.target_lane;
                 self.player.target_lane -= 1;
-                self.player.lerp = 1.0 - self.player.lerp;
+                self.player.lerp = 0.0;
             }
-        } else if self.player.lerp < 1.0 {
-            self.player.lerp += displacement;
         }
+        self.player.lerp += displacement;
+        if self.player.lerp > 1.0 {
+            self.player.lerp = 1.0;
+        }
+
         let start = (self.player.current_lane as f32 - 1.0) * 1.75;
         let end = (self.player.target_lane as f32 - 1.0) * 1.75;
         self.player.cube.transform.position.x =
@@ -238,8 +241,6 @@ impl GameState {
         let mut cubes = Vec::with_capacity(64);
         for i in 0..map.beats.len() {
             let (l, m, r) = map.beats[i];
-            // Amount to shift so beat is when the user show press
-            // TODO: Figure out extra padding from sub divisions and speeds
             let padding = -(map.start_offset + i as f32) * BEAT_SIZE;
             if l {
                 cubes.push(Cube {
