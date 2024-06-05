@@ -6,7 +6,7 @@ use std::{
 };
 
 use gl::types::*;
-use image::DynamicImage;
+use image::{ColorType, DynamicImage};
 use na::Matrix4;
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
 pub struct CubeRenderer {
     shader_id: u32,
     vao: u32,
-    texture: u32,
+    textures: Vec<u32>,
     view_uniform: i32,
     projection_uniform: i32,
     camera_position_uniform: i32,
@@ -56,7 +56,7 @@ impl CubeRenderer {
         frag_shader: &PathBuf,
         vertices: &[f32],
         indices: &[u32],
-        texture: DynamicImage,
+        textures: &[DynamicImage],
     ) -> Result<Self, OpenGLError> {
         unsafe {
             // Create program
@@ -128,22 +128,32 @@ impl CubeRenderer {
             gl::EnableVertexAttribArray(2);
 
             // texture
-            let mut texture_location = 0;
-            let texture_bytes = texture.as_bytes();
-            gl::GenTextures(1, &mut texture_location);
-            gl::BindTexture(gl::TEXTURE_2D, texture_location);
-            gl::TexImage2D(
-                gl::TEXTURE_2D,
-                0,
-                gl::RGB as i32,
-                texture.width() as i32,
-                texture.height() as i32,
-                0,
-                gl::RGB,
-                gl::UNSIGNED_BYTE,
-                &texture_bytes[0] as *const _ as *const c_void,
-            );
-            gl::GenerateMipmap(gl::TEXTURE_2D);
+            let mut texture_locations = Vec::with_capacity(textures.len());
+            for texture in textures {
+                let mut texture_location = 0;
+                let texture_bytes = texture.as_bytes();
+                let format = match texture.color() {
+                    ColorType::Rgb8 => gl::RGB,
+                    ColorType::Rgba8 => gl::RGBA,
+                    // TODO: Find what each color type should match to
+                    _ => gl::RGB,
+                };
+                gl::GenTextures(1, &mut texture_location);
+                gl::BindTexture(gl::TEXTURE_2D, texture_location);
+                gl::TexImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    format as i32,
+                    texture.width() as i32,
+                    texture.height() as i32,
+                    0,
+                    format,
+                    gl::UNSIGNED_BYTE,
+                    &texture_bytes[0] as *const _ as *const c_void,
+                );
+                gl::GenerateMipmap(gl::TEXTURE_2D);
+                texture_locations.push(texture_location);
+            }
 
             // Get uniforms
             let material = MaterialUniform {
@@ -152,6 +162,7 @@ impl CubeRenderer {
                 specular: gl::GetUniformLocation(program, SPECULAR.as_ptr()),
                 shininess: gl::GetUniformLocation(program, SHININESS.as_ptr()),
             };
+
             let camera_position_uniform = gl::GetUniformLocation(program, CAMERA_POSITION.as_ptr());
             let projection_uniform = gl::GetUniformLocation(program, PROJECTION.as_ptr());
             let view_uniform = gl::GetUniformLocation(program, VIEW.as_ptr());
@@ -200,7 +211,7 @@ impl CubeRenderer {
             Ok(Self {
                 shader_id: program,
                 vao,
-                texture: texture_location,
+                textures: texture_locations,
                 indices: indices.to_vec(),
                 material_uniform: material,
                 camera_position_uniform,
@@ -225,8 +236,6 @@ impl CubeRenderer {
         unsafe {
             gl::UseProgram(self.shader_id);
 
-            gl::ActiveTexture(gl::TEXTURE0);
-            gl::BindTexture(gl::TEXTURE_2D, self.texture);
             gl::BindVertexArray(self.vao);
             gl::BufferData(
                 gl::ELEMENT_ARRAY_BUFFER,
@@ -285,6 +294,8 @@ impl CubeRenderer {
             );
 
             for cube in cubes {
+                gl::ActiveTexture(gl::TEXTURE0);
+                gl::BindTexture(gl::TEXTURE_2D, self.textures[cube.material.texture]);
                 let transform = cube.transform.to_matrix4();
                 gl::UniformMatrix4fv(
                     self.transformation_uniform,
@@ -304,12 +315,10 @@ impl CubeRenderer {
                     cube.material.diffuse.1,
                     cube.material.diffuse.2,
                 );
-                gl::Uniform3f(
-                    self.material_uniform.specular,
-                    cube.material.specular.0,
-                    cube.material.specular.1,
-                    cube.material.specular.2,
-                );
+                // Use Texture1 for specular
+                gl::Uniform1i(self.material_uniform.specular, 1);
+                gl::ActiveTexture(gl::TEXTURE1);
+                gl::BindTexture(gl::TEXTURE_2D, self.textures[cube.material.specular_texture]);
                 gl::Uniform1i(self.material_uniform.shininess, cube.material.shininess);
                 gl::DrawElements(
                     gl::TRIANGLES,

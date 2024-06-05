@@ -12,6 +12,7 @@ use na::Perspective3;
 use plane_renderer::PlaneRenderer;
 use point_light_renderer::PointLightRenderer;
 
+use crate::config::{CONTAINER_SPECULAR_TEXTURE, CONTAINER_TEXTURE};
 use crate::shader::PointLight;
 use crate::state::GameState;
 
@@ -51,13 +52,15 @@ impl Renderer {
 
         let cube_vert_shader = PathBuf::from(CUBE_VERT_SHADER);
         let texture_frag_shader = PathBuf::from(TEXTURE_FRAG_SHADER);
-        let texture = image::open(WALL_TEXTURE).unwrap();
+        let wall_texture = image::open(WALL_TEXTURE).unwrap();
+        let container_texture = image::open(CONTAINER_TEXTURE).unwrap();
+        let container_specular_texture = image::open(CONTAINER_SPECULAR_TEXTURE).unwrap();
         let cube = CubeRenderer::new(
             &cube_vert_shader,
             &texture_frag_shader,
             &TEXTURED_CUBE_VERTICES,
             &TEXTURED_CUBE_INDICES,
-            texture,
+            &[wall_texture, container_texture, container_specular_texture],
         )
         .unwrap();
 

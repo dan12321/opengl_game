@@ -2,7 +2,7 @@
 struct Material {
     vec3 ambient;
     vec3 diffuse;
-    vec3 specular;
+    sampler2D specular;
     int shininess;
 };
 
@@ -35,8 +35,8 @@ uniform DirLight dirLights[NR_DIR_LIGHTS];
 
 out vec4 FragColor;
 
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir);
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 cameraDir);
+vec3 CalcPointLight(PointLight light, vec2 texCoord, vec3 normal, vec3 fragPos, vec3 cameraDir);
+vec3 CalcDirLight(DirLight light, vec2 texCoord, vec3 normal, vec3 cameraDir);
 void main()
 {
     vec2 texCoord = vec2(TexCoord.x, TexCoord.y + offset);
@@ -45,17 +45,17 @@ void main()
 
     vec3 color = material.ambient;
     for (int i = 0; i < NR_POINT_LIGHTS; i++) {
-        color += CalcPointLight(pointLights[i], Normal, FragPos, cameraDir);
+        color += CalcPointLight(pointLights[i], texCoord, Normal, FragPos, cameraDir);
     }
 
     for (int i = 0; i < NR_DIR_LIGHTS; i++) {
-        color += CalcDirLight(dirLights[i], Normal, cameraDir);
+        color += CalcDirLight(dirLights[i], texCoord, Normal, cameraDir);
     }
 
     FragColor = vec4(color, 1.0) * tex;
 }
 
-vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir)
+vec3 CalcPointLight(PointLight light, vec2 texCoord, vec3 normal, vec3 fragPos, vec3 cameraDir)
 {
     vec3 lightDir = normalize(light.position - fragPos);
     float lightDist = distance(fragPos, light.position);
@@ -66,19 +66,19 @@ vec3 CalcPointLight(PointLight light, vec3 normal, vec3 fragPos, vec3 cameraDir)
 
     vec3 reflectDir = reflect(-lightDir, normal);
     float specularIntensity = distanceFallOff * pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
-    vec3 specular = specularIntensity * light.specular * material.specular;
+    vec3 specular = specularIntensity * light.specular * texture2D(material.specular, texCoord).rgb;
 
     return specular + diffuse;
 }
 
-vec3 CalcDirLight(DirLight light, vec3 normal, vec3 cameraDir)
+vec3 CalcDirLight(DirLight light, vec2 texCoord, vec3 normal, vec3 cameraDir)
 {
     float diffuseIntensity = max(dot(normal, light.direction), 0.0);
     vec3 diffuse = diffuseIntensity * material.diffuse * light.diffuse;
 
     vec3 reflectDir = reflect(-light.direction, normal);
     float specularIntensity = pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
-    vec3 specular = specularIntensity * light.specular * material.specular;
+    vec3 specular = specularIntensity * light.specular * texture2D(material.specular, texCoord).rgb;
 
     return specular + diffuse;
 }

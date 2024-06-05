@@ -127,17 +127,21 @@ fn main() {
         }
 
         state.update(delta_time, &controller);
-        if state.status != last_status {
+        if state.status.clone() != last_status {
             match state.status {
-                Status::Alive => (),
+                Status::Alive => {
+                    audio.track_action(audio::Action::Play(current_track));
+                },
                 Status::Dead => {
                     audio.track_action(audio::Action::Slow(current_track));
                     audio.track_action(audio::Action::Play(death_track));
-                }
+                },
                 Status::Resetting => {
                     audio.track_action(audio::Action::Reset(current_track));
-                    audio.track_action(audio::Action::Play(current_track));
-                }
+                },
+                Status::Paused(_) => {
+                    audio.track_action(audio::Action::Stop(current_track));
+                },
             }
         }
         renderer.render(&state);

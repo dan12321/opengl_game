@@ -41,7 +41,7 @@ impl GameState {
             point_lights: lights,
             dir_lights: vec![
                 DirLight {
-                    direction: (0.316227, 0.95, 0.3),
+                    direction: (0.0, -0.95, 0.34),
                     diffuse: (0.75, 0.95, 1.0),
                     specular: (0.6, 0.6, 0.6),
                 }
@@ -66,7 +66,7 @@ impl GameState {
                     scale: (PLANE_WIDTH, PLANE_LENGTH, 1.0).into(),
                     rotation: Rotation3::from_euler_angles(1.570796, 0.0, 0.0).to_homogeneous(),
                 },
-                material: PLAYER_MATERIAL,
+                material: BOX_MATERIAL,
                 offset: 0.0,
             },
             map,
@@ -75,9 +75,10 @@ impl GameState {
     }
 
     pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
-        self.status = match self.status {
+        self.status = match self.status.to_owned() {
             Status::Alive => self.alive_update(delta_time, controller),
             Status::Dead => self.dead_update(delta_time, controller),
+            Status::Paused(ls) => self.pause_update(controller, ls),
             Status::Resetting => self.resetting_update(),
         }
     }
@@ -151,6 +152,10 @@ impl GameState {
             }
         }
 
+        if controller.buttons().contains(&Button::Pause) {
+            return Status::Paused(Status::Alive.into());
+        }
+
         Status::Alive
     }
 
@@ -182,10 +187,29 @@ impl GameState {
         // controller input
         let reset = controller.buttons().contains(&Button::Restart);
         if reset {
-            Status::Resetting
-        } else {
-            Status::Dead
+            return Status::Resetting;
         }
+        if controller.buttons().contains(&Button::Pause) {
+            return Status::Paused(Status::Dead.into());
+        }
+        Status::Dead
+    }
+
+    fn pause_update(&mut self, controller: &Controller, last_status: usize) -> Status {
+        // controller input
+        let (camera_lat, camera_long) = controller.angle();
+        self.camera.longitude = camera_long;
+        self.camera.latitude = camera_lat;
+        self.camera.distance = controller.zoom();
+        let reset = controller.buttons().contains(&Button::Restart);
+        let unpause = controller.buttons().contains(&Button::Pause);
+
+        if reset {
+            return Status::Resetting;
+        } else if unpause {
+            return last_status.into();
+        }
+        Status::Paused(last_status)
     }
 
     fn resetting_update(&mut self) -> Status {
@@ -257,7 +281,7 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: PLAYER_MATERIAL,
+                    material: BOX_MATERIAL,
                 });
             }
             if m {
@@ -267,7 +291,7 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: PLAYER_MATERIAL,
+                    material: BOX_MATERIAL,
                 });
             }
             if r {
@@ -277,7 +301,7 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: PLAYER_MATERIAL,
+                    material: BOX_MATERIAL,
                 });
             }
         }
@@ -361,8 +385,17 @@ impl Transform {
 pub static PLAYER_MATERIAL: Material = Material {
     ambient: (0.1, 0.1, 0.1),
     diffuse: (0.5, 0.5, 0.5),
-    specular: (0.7, 0.7, 0.7),
+    specular_texture: 2,
+    shininess: 128,
+    texture: 1,
+};
+
+pub static BOX_MATERIAL: Material = Material {
+    ambient: (0.1, 0.1, 0.1),
+    diffuse: (0.5, 0.5, 0.5),
+    specular_texture: 0,
     shininess: 8,
+    texture: 0,
 };
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -370,4 +403,29 @@ pub enum Status {
     Alive,
     Dead,
     Resetting,
+    // Using a usize to represent last status since other status' don't contain
+    // data and it make ownership easier
+    Paused(usize),
+}
+
+impl From<usize> for Status {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => Status::Alive,
+            1 => Status::Dead,
+            2 => Status::Resetting,
+            _ => panic!("unexpected status value"),
+        }
+    }
+}
+
+impl Into<usize> for Status {
+    fn into(self) -> usize {
+        match self {
+            Self::Alive => 0,
+            Self::Dead => 1,
+            Self::Resetting => 2,
+            Self::Paused(_) => panic!("can't represent paused as usize"),
+        }
+    }
 }

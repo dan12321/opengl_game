@@ -66,8 +66,9 @@ pub enum OpenGLError {
 pub struct Material {
     pub ambient: (f32, f32, f32),
     pub diffuse: (f32, f32, f32),
-    pub specular: (f32, f32, f32),
+    pub specular_texture: usize,
     pub shininess: GLint,
+    pub texture: usize,
 }
 
 #[derive(Debug, Copy, Clone)]

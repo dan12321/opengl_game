@@ -143,6 +143,10 @@ impl PlaneRenderer {
                 specular: gl::GetUniformLocation(program, SPECULAR.as_ptr()),
                 shininess: gl::GetUniformLocation(program, SHININESS.as_ptr()),
             };
+
+            // Use Texture1 for specular
+            gl::Uniform1i(material.specular, 1);
+
             let camera_position_uniform = gl::GetUniformLocation(program, CAMERA_POSITION.as_ptr());
             let projection_uniform = gl::GetUniformLocation(program, PROJECTION.as_ptr());
             let view_uniform = gl::GetUniformLocation(program, VIEW.as_ptr());
@@ -297,12 +301,8 @@ impl PlaneRenderer {
                     plane.material.diffuse.1,
                     plane.material.diffuse.2,
                 );
-                gl::Uniform3f(
-                    self.material_uniform.specular,
-                    plane.material.specular.0,
-                    plane.material.specular.1,
-                    plane.material.specular.2,
-                );
+                gl::ActiveTexture(gl::TEXTURE1);
+                gl::BindTexture(gl::TEXTURE_2D, self.texture);
                 gl::Uniform1i(self.material_uniform.shininess, plane.material.shininess);
                 gl::Uniform1f(self.offset_uniform, plane.offset);
                 gl::DrawElements(

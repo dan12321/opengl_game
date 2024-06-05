@@ -18,6 +18,7 @@ pub struct Controller<'a> {
 pub enum Button {
     Restart,
     Quit,
+    Pause,
     Level1,
     Level2,
 }
@@ -53,6 +54,9 @@ impl<'a> Controller<'a> {
                 WindowEvent::Key(Key::R, _, Action::Press, _) => {
                     buttons.push(Button::Restart);
                 },
+                WindowEvent::Key(Key::P, _, Action::Press, _) => {
+                    buttons.push(Button::Pause);
+                },
                 WindowEvent::Key(Key::Right, _, Action::Press, _) => {
                     self.direction_x = 1.0;
                     x_set = true;
@@ -62,10 +66,10 @@ impl<'a> Controller<'a> {
                     x_set = true;
                 },
                 WindowEvent::CursorPos(x, y) => {
-                    let x = x as f32;
-                    let y = y as f32;
-                    let min_cy = config::MIN_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
-                    let max_cy = config::MAX_CAMERA_LONGITUDE / config::CURSOR_MOVEMENT_SCALE;
+                    let x = x as f32 / config::CURSOR_MOVEMENT_SCALE;
+                    let y = y as f32 / config::CURSOR_MOVEMENT_SCALE;
+                    let min_cy = config::MIN_CAMERA_LONGITUDE;
+                    let max_cy = config::MAX_CAMERA_LONGITUDE;
                     let cy_min_clamped = if y < min_cy { min_cy } else { y };
                     let cy_clamped = if cy_min_clamped > max_cy {
                         max_cy
@@ -74,7 +78,9 @@ impl<'a> Controller<'a> {
                     };
                     self.camera_x = x;
                     self.camera_y = cy_clamped;
-                    window.set_cursor_pos(self.camera_x as f64, self.camera_y as f64);
+                    window.set_cursor_pos(
+                        (x * config::CURSOR_MOVEMENT_SCALE) as f64,
+                        (cy_clamped * config::CURSOR_MOVEMENT_SCALE) as f64);
                 },
                 WindowEvent::Scroll(_, y) => {
                     let zoom = self.zoom - (y as f32 * SCROLL_ZOOM_SCALE);
@@ -101,5 +107,13 @@ impl<'a> Controller<'a> {
 
     pub fn direction(&self) -> f32 {
         self.direction_x
+    }
+
+    pub fn angle(&self) -> (f32, f32) {
+        (self.camera_x, self.camera_y)
+    }
+
+    pub fn zoom(&self) -> f32 {
+        self.zoom
     }
 }
