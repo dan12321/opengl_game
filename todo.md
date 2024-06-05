@@ -21,6 +21,7 @@
     - Increased precision of time variables to f64. Still slight drift between
       wav time and measured time but the rate of rate no longer changes (solving pitch).
   - [ ] Add stereo support
+  - [ ] Add mp3 support
   - [X] Refactor to not use magic numbers
 - [ ] Scene stuff
   - [ ] Add menus
@@ -43,6 +44,8 @@
     - Add audio effect to music like slow down
     - Wait for input and restart song
   - [ ] Move camera slightly with movement
+  - [ ] Tilt camera up slightly so it looks ahead of the player
 - [ ] Misc
   - [ ] Replace unwraps with proper error handling
   - [ ] Look into porting to android
+  - [ ] Make it so the plane repeats instead of stretching
