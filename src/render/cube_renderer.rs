@@ -16,7 +16,7 @@ use crate::{
 
 pub struct CubeRenderer {
     shader_id: u32,
-    vao: u32,
+    parsed_models: Vec<ParsedModel>,
     textures: Vec<u32>,
     view_uniform: i32,
     projection_uniform: i32,
@@ -25,37 +25,13 @@ pub struct CubeRenderer {
     material_uniform: MaterialUniform,
     point_light_uniform: [PointLightUniform; MAX_LIGHTS],
     dir_light_uniform: [DirLightUniform; MAX_LIGHTS],
-    indices: Vec<u32>,
-}
-
-#[derive(Copy, Clone, Debug)]
-struct PointLightUniform {
-    position: i32,
-    diffuse: i32,
-    specular: i32,
-    strength: i32,
-}
-
-#[derive(Copy, Clone, Debug)]
-struct DirLightUniform {
-    direction: i32,
-    diffuse: i32,
-    specular: i32,
-}
-
-struct MaterialUniform {
-    ambient: i32,
-    diffuse: i32,
-    specular: i32,
-    shininess: i32,
 }
 
 impl CubeRenderer {
     pub fn new(
         vert_shader: &PathBuf,
         frag_shader: &PathBuf,
-        vertices: &[f32],
-        indices: &[u32],
+        models: Vec<Model>,
         textures: &[DynamicImage],
     ) -> Result<Self, OpenGLError> {
         unsafe {
@@ -87,45 +63,54 @@ impl CubeRenderer {
             gl::DeleteShader(vert);
             gl::DeleteShader(frag);
 
+            let mut parsed_models = Vec::with_capacity(models.len());
             // Set up vertices and indeces
-            let mut vao = 0;
-            let mut vbo = 0;
-            let mut ebo = 0;
-            gl::GenVertexArrays(1, &mut vao);
-            gl::GenBuffers(1, &mut vbo);
-            gl::GenBuffers(1, &mut ebo);
-            gl::BindVertexArray(vao);
-            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-            gl::BufferData(
-                gl::ARRAY_BUFFER,
-                (vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
-                &vertices[0] as *const _ as *const c_void,
-                gl::STATIC_DRAW,
-            );
+            for model in models {
+                let mut vao = 0;
+                let mut vbo = 0;
+                let mut ebo = 0;
+                gl::GenVertexArrays(1, &mut vao);
+                gl::GenBuffers(1, &mut vbo);
+                gl::GenBuffers(1, &mut ebo);
+                gl::BindVertexArray(vao);
+                gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+                gl::BufferData(
+                    gl::ARRAY_BUFFER,
+                    (model.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                    &model.vertices[0] as *const _ as *const c_void,
+                    gl::STATIC_DRAW,
+                );
+    
+                gl::BufferData(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    (model.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                    &model.indices[0] as *const _ as *const c_void,
+                    gl::STATIC_DRAW,
+                );
 
-            gl::BufferData(
-                gl::ELEMENT_ARRAY_BUFFER,
-                (indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                &indices[0] as *const _ as *const c_void,
-                gl::STATIC_DRAW,
-            );
-            gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-            let stride = 8 * mem::size_of::<GLfloat>() as i32;
-            gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
-            gl::EnableVertexAttribArray(0);
-            let normal_start = 3 * mem::size_of::<GLfloat>() as i32;
-            gl::VertexAttribPointer(
-                1,
-                3,
-                gl::FLOAT,
-                gl::FALSE,
-                stride,
-                normal_start as *mut c_void,
-            );
-            gl::EnableVertexAttribArray(1);
-            let tex_start = normal_start + (3 * mem::size_of::<GLfloat>() as i32);
-            gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, stride, tex_start as *mut c_void);
-            gl::EnableVertexAttribArray(2);
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
+                let stride = 8 * mem::size_of::<GLfloat>() as i32;
+                gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
+                gl::EnableVertexAttribArray(0);
+                let normal_start = 3 * mem::size_of::<GLfloat>() as i32;
+                gl::VertexAttribPointer(
+                    1,
+                    3,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    stride,
+                    normal_start as *mut c_void,
+                );
+                gl::EnableVertexAttribArray(1);
+                let tex_start = normal_start + (3 * mem::size_of::<GLfloat>() as i32);
+                gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, stride, tex_start as *mut c_void);
+                gl::EnableVertexAttribArray(2);
+
+                parsed_models.push(ParsedModel {
+                    vao,
+                    indices: model.indices,
+                });
+            }
 
             // texture
             let mut texture_locations = Vec::with_capacity(textures.len());
@@ -210,9 +195,8 @@ impl CubeRenderer {
             }
             Ok(Self {
                 shader_id: program,
-                vao,
+                parsed_models,
                 textures: texture_locations,
-                indices: indices.to_vec(),
                 material_uniform: material,
                 camera_position_uniform,
                 projection_uniform,
@@ -236,13 +220,6 @@ impl CubeRenderer {
         unsafe {
             gl::UseProgram(self.shader_id);
 
-            gl::BindVertexArray(self.vao);
-            gl::BufferData(
-                gl::ELEMENT_ARRAY_BUFFER,
-                (self.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                &self.indices[0] as *const _ as *const c_void,
-                gl::STATIC_DRAW,
-            );
             for i in 0..point_lights.len() {
                 gl::Uniform3f(
                     self.point_light_uniform[i].position,
@@ -294,6 +271,14 @@ impl CubeRenderer {
             );
 
             for cube in cubes {
+                let model = &self.parsed_models[cube.model];
+                gl::BindVertexArray(model.vao);
+                gl::BufferData(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    (model.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                    &model.indices[0] as *const _ as *const c_void,
+                    gl::STATIC_DRAW,
+                );
                 gl::ActiveTexture(gl::TEXTURE0);
                 gl::BindTexture(gl::TEXTURE_2D, self.textures[cube.material.texture]);
                 let transform = cube.transform.to_matrix4();
@@ -322,7 +307,7 @@ impl CubeRenderer {
                 gl::Uniform1i(self.material_uniform.shininess, cube.material.shininess);
                 gl::DrawElements(
                     gl::TRIANGLES,
-                    self.indices.len() as i32,
+                    model.indices.len() as i32,
                     gl::UNSIGNED_INT,
                     ptr::null(),
                 );
@@ -330,6 +315,38 @@ impl CubeRenderer {
             gl::BindVertexArray(0);
         }
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+struct PointLightUniform {
+    position: i32,
+    diffuse: i32,
+    specular: i32,
+    strength: i32,
+}
+
+#[derive(Copy, Clone, Debug)]
+struct DirLightUniform {
+    direction: i32,
+    diffuse: i32,
+    specular: i32,
+}
+
+struct MaterialUniform {
+    ambient: i32,
+    diffuse: i32,
+    specular: i32,
+    shininess: i32,
+}
+
+pub struct Model {
+    pub vertices: Vec<f32>,
+    pub indices: Vec<u32>,
+}
+
+struct ParsedModel {
+    vao: u32,
+    indices: Vec<u32>,
 }
 
 const TRANSFORMATION: &'static CStr =

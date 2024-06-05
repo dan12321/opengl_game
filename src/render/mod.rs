@@ -5,7 +5,7 @@ mod point_light_renderer;
 use std::f32::consts::PI;
 use std::path::PathBuf;
 
-use cube_renderer::CubeRenderer;
+use cube_renderer::{CubeRenderer, Model};
 use gl;
 use gl::types::*;
 use na::Perspective3;
@@ -55,11 +55,20 @@ impl Renderer {
         let wall_texture = image::open(WALL_TEXTURE).unwrap();
         let container_texture = image::open(CONTAINER_TEXTURE).unwrap();
         let container_specular_texture = image::open(CONTAINER_SPECULAR_TEXTURE).unwrap();
+        let models = vec![
+            Model {
+                vertices: TEXTURED_CUBE_VERTICES.into(),
+                indices: TEXTURED_CUBE_INDICES.into(),
+            },
+            Model {
+                vertices: QUAD_VERTICES.into(),
+                indices: QUAD_INDICES.into(),
+            },
+        ];
         let cube = CubeRenderer::new(
             &cube_vert_shader,
             &texture_frag_shader,
-            &TEXTURED_CUBE_VERTICES,
-            &TEXTURED_CUBE_INDICES,
+            models,
             &[wall_texture, container_texture, container_specular_texture],
         )
         .unwrap();
@@ -106,8 +115,7 @@ impl Renderer {
             view,
             self.projection.as_matrix().clone(),
         );
-
-        self.plane.draw(
+        self.cube.draw(
             &[state.plane],
             &light_uniforms,
             &state.dir_lights,
