@@ -201,8 +201,8 @@ impl GameState {
     fn pause_update(&mut self, controller: &Controller, last_status: usize) -> Status {
         // controller input
         let (camera_lat, camera_long) = controller.angle();
-        self.camera.longitude = camera_long;
-        self.camera.latitude = camera_lat;
+        self.camera.latitude = camera_long;
+        self.camera.longitude = camera_lat;
         self.camera.distance = controller.zoom();
         let reset = controller.buttons().contains(&Button::Restart);
         let unpause = controller.buttons().contains(&Button::Pause);

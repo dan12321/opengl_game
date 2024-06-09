@@ -68,8 +68,8 @@ impl<'a> Controller<'a> {
                 WindowEvent::CursorPos(x, y) => {
                     let x = x as f32 / config::CURSOR_MOVEMENT_SCALE;
                     let y = y as f32 / config::CURSOR_MOVEMENT_SCALE;
-                    let min_cy = config::MIN_CAMERA_LONGITUDE;
-                    let max_cy = config::MAX_CAMERA_LONGITUDE;
+                    let min_cy = config::MIN_CAMERA_LATITUDE;
+                    let max_cy = config::MAX_CAMERA_LATITUDE;
                     let cy_min_clamped = if y < min_cy { min_cy } else { y };
                     let cy_clamped = if cy_min_clamped > max_cy {
                         max_cy

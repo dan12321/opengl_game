@@ -4,35 +4,35 @@ use na::{vector, Matrix4, Rotation3, Translation3, Vector3};
 pub struct Camera {
     pub distance: GLfloat,
     pub default_distance: GLfloat,
-    pub latitude: GLfloat,
     pub longitude: GLfloat,
+    pub latitude: GLfloat,
     pub target: Vector3<GLfloat>,
 }
 
 impl Camera {
     pub fn new(
         default_distance: GLfloat,
-        latitude: GLfloat,
         longitude: GLfloat,
+        latitude: GLfloat,
         target: Vector3<GLfloat>,
     ) -> Self {
         Self {
             distance: default_distance,
             default_distance,
-            latitude,
             longitude,
+            latitude,
             target,
         }
     }
 
     pub fn transform(&self) -> Matrix4<GLfloat> {
         let y_axis = Vector3::y_axis();
-        let x_axis = Vector3::x_axis();
-        let longitude_rotation =
-            Rotation3::from_axis_angle(&x_axis, self.longitude).to_homogeneous();
-        let latitude_rotation = Rotation3::from_axis_angle(&y_axis, self.latitude).to_homogeneous();
+        let x_axis: na::Unit<na::Matrix<f32, na::Const<3>, na::Const<1>, na::ArrayStorage<f32, 3, 1>>> = Vector3::x_axis();
+        let latitude_rotation =
+            Rotation3::from_axis_angle(&x_axis, self.latitude).to_homogeneous();
+        let longitude_rotation = Rotation3::from_axis_angle(&y_axis, self.longitude).to_homogeneous();
         let relative_position_homogeneous =
-            latitude_rotation * longitude_rotation * vector![0.0, 0.0, -self.distance, 1.0];
+            longitude_rotation * latitude_rotation * vector![0.0, 0.0, -self.distance, 1.0];
         let relative_position = vector![
             relative_position_homogeneous[0],
             relative_position_homogeneous[1],
@@ -50,8 +50,8 @@ impl Camera {
         let y_axis = Vector3::y_axis();
         let x_axis = Vector3::x_axis();
         let longitude_rotation =
-            Rotation3::from_axis_angle(&x_axis, self.longitude).to_homogeneous();
-        let latitude_rotation = Rotation3::from_axis_angle(&y_axis, self.latitude).to_homogeneous();
+            Rotation3::from_axis_angle(&x_axis, self.latitude).to_homogeneous();
+        let latitude_rotation = Rotation3::from_axis_angle(&y_axis, self.longitude).to_homogeneous();
         let relative_position_homogeneous =
             latitude_rotation * longitude_rotation * vector![0.0, 0.0, -self.distance, 1.0];
         let relative_position = vector![
