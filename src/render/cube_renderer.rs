@@ -22,6 +22,7 @@ pub struct CubeRenderer {
     projection_uniform: i32,
     camera_position_uniform: i32,
     transformation_uniform: i32,
+    offset_uniform: i32,
     material_uniform: MaterialUniform,
     point_light_uniform: [PointLightUniform; MAX_LIGHTS],
     dir_light_uniform: [DirLightUniform; MAX_LIGHTS],
@@ -152,6 +153,8 @@ impl CubeRenderer {
             let projection_uniform = gl::GetUniformLocation(program, PROJECTION.as_ptr());
             let view_uniform = gl::GetUniformLocation(program, VIEW.as_ptr());
             let transformation_uniform = gl::GetUniformLocation(program, TRANSFORMATION.as_ptr());
+            let offset_uniform = gl::GetUniformLocation(program, OFFSET.as_ptr());
+
 
             let mut point_lights = [PointLightUniform {
                 position: -1,
@@ -202,6 +205,7 @@ impl CubeRenderer {
                 projection_uniform,
                 view_uniform,
                 transformation_uniform,
+                offset_uniform,
                 point_light_uniform: point_lights,
                 dir_light_uniform: dir_lights,
             })
@@ -288,6 +292,7 @@ impl CubeRenderer {
                     gl::FALSE,
                     transform.as_ptr(),
                 );
+                gl::Uniform1f(self.offset_uniform, cube.offset);
                 gl::Uniform3f(
                     self.material_uniform.ambient,
                     cube.material.ambient.0,
@@ -351,10 +356,12 @@ struct ParsedModel {
 
 const TRANSFORMATION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"transformation\0") };
+    
 const PROJECTION: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"projection\0") };
 const VIEW: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"view\0") };
 const CAMERA_POSITION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"cameraPosition\0") };
+const OFFSET: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"offset\0") };
 const AMBIENT: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"material.ambient\0") };
 const DIFFUSE: &'static CStr =

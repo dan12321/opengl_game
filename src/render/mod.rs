@@ -1,5 +1,4 @@
 mod cube_renderer;
-mod plane_renderer;
 mod point_light_renderer;
 
 use std::f32::consts::PI;
@@ -9,7 +8,6 @@ use cube_renderer::{CubeRenderer, Model};
 use gl;
 use gl::types::*;
 use na::Perspective3;
-use plane_renderer::PlaneRenderer;
 use point_light_renderer::PointLightRenderer;
 
 use crate::config::{CONTAINER_SPECULAR_TEXTURE, CONTAINER_TEXTURE};
@@ -17,7 +15,7 @@ use crate::shader::PointLight;
 use crate::state::GameState;
 
 use super::config::{
-    CUBE_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, PLANE_VERT_SHADER, TEXTURE_FRAG_SHADER,
+    CUBE_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
     WALL_TEXTURE,
 };
 use super::shape::{
@@ -28,7 +26,6 @@ use super::shape::{
 pub struct Renderer {
     light: PointLightRenderer,
     cube: CubeRenderer,
-    plane: PlaneRenderer,
     projection: Perspective3<GLfloat>,
 }
 
@@ -73,21 +70,9 @@ impl Renderer {
         )
         .unwrap();
 
-        let plane_vert_shader = PathBuf::from(PLANE_VERT_SHADER);
-        let texture = image::open(WALL_TEXTURE).unwrap();
-        let plane = PlaneRenderer::new(
-            &plane_vert_shader,
-            &texture_frag_shader,
-            &QUAD_VERTICES,
-            &QUAD_INDICES,
-            texture,
-        )
-        .unwrap();
-
         Self {
             light,
             cube,
-            plane,
             projection,
         }
     }
@@ -100,23 +85,7 @@ impl Renderer {
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
         self.cube.draw(
-            &state.cubes,
-            &light_uniforms,
-            &state.dir_lights,
-            &state.camera.position().into(),
-            view,
-            self.projection.as_matrix().clone(),
-        );
-        self.cube.draw(
-            &[state.player.cube],
-            &light_uniforms,
-            &state.dir_lights,
-            &state.camera.position().into(),
-            view,
-            self.projection.as_matrix().clone(),
-        );
-        self.cube.draw(
-            &[state.plane],
+            &[state.cubes.as_slice(), &[state.player.cube, state.plane]].concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),

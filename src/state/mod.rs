@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use map::Map;
-use na::{vector, Matrix, Matrix4, Rotation3};
+use na::{vector, Matrix4};
 
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
@@ -58,6 +58,7 @@ impl GameState {
                     },
                     material: PLAYER_MATERIAL,
                     model: 0,
+                    offset: 0.0,
                 },
             },
             speed: BEAT_SIZE * (map.bpm / 60.0) * map.subdivisions,
@@ -69,7 +70,7 @@ impl GameState {
                 },
                 material: BOX_MATERIAL,
                 model: 1,
-                // offset: 0.0,
+                offset: 0.0,
             },
             map,
             status: Status::Alive,
@@ -137,7 +138,7 @@ impl GameState {
         }
 
         // plane update
-        // self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
 
         // Check collisions
         let player_collider = AABBColider {
@@ -184,7 +185,7 @@ impl GameState {
         self.player.cube.transform.position.z += displacement;
 
         // plane update
-        // self.plane.offset -= displacement / PLANE_LENGTH;
+        self.plane.offset -= displacement / PLANE_LENGTH;
 
         // controller input
         let reset = controller.buttons().contains(&Button::Restart);
@@ -285,6 +286,7 @@ impl GameState {
                     },
                     material: BOX_MATERIAL,
                     model: 0,
+                    offset: 0.0,
                 });
             }
             if m {
@@ -296,6 +298,7 @@ impl GameState {
                     },
                     material: BOX_MATERIAL,
                     model: 0,
+                    offset: 0.0,
                 });
             }
             if r {
@@ -307,6 +310,7 @@ impl GameState {
                     },
                     material: BOX_MATERIAL,
                     model: 0,
+                    offset: 0.0,
                 });
             }
         }
@@ -319,12 +323,6 @@ pub struct Cube {
     pub transform: Transform,
     pub material: Material,
     pub model: usize,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct Plane {
-    pub transform: Transform,
-    pub material: Material,
     pub offset: f32,
 }
 
