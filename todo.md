@@ -31,7 +31,7 @@
           push on the resources for the next scene
     - [ ] Add loading screen and reset time
   - [X] Read map from file
-  - [ ] Add beet offset to map file 
+  - [X] Add beet offset to map file 
 - [ ] Control/feel
   - [X] Fix bug in position update (sometimes flashes in old position)
     - Was due to linear interpolation calculation
