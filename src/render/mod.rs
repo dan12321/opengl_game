@@ -1,5 +1,6 @@
 mod cube_renderer;
 mod point_light_renderer;
+mod model_loader;
 
 use std::f32::consts::PI;
 use std::path::PathBuf;
@@ -9,6 +10,7 @@ use gl;
 use gl::types::*;
 use na::Perspective3;
 use point_light_renderer::PointLightRenderer;
+use tracing::debug;
 
 use crate::config::{CONTAINER_SPECULAR_TEXTURE, CONTAINER_TEXTURE};
 use crate::shader::PointLight;
@@ -62,6 +64,9 @@ impl Renderer {
                 indices: QUAD_INDICES.into(),
             },
         ];
+
+        let model = model_loader::Model::load(&"assets/models/backpack/backpack.obj".into());
+        debug!(model = format!("{:?}", model), "loaded model");
         let cube = CubeRenderer::new(
             &cube_vert_shader,
             &texture_frag_shader,
