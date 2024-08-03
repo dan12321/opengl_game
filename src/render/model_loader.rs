@@ -6,13 +6,12 @@ use tracing::{warn, error, debug};
 #[derive(Debug)]
 pub struct Model {
     pub objects: Vec<Object>,
-    pub materials: Vec<Material>,
 }
 
 pub struct Object {
     pub name: String,
-    vertices: Vec<f32>,
-    indices: Vec<u32>,
+    pub vertices: Vec<f32>,
+    pub indices: Vec<u32>,
     pub material: usize,
 }
 
@@ -22,8 +21,11 @@ impl Debug for Object {
     }
 }
 
-impl Model {
-    pub fn load(obj_file: &PathBuf) -> Self {
+impl Object {
+    pub fn load(
+        obj_file: &PathBuf,
+        textures: &mut Vec<Texture>,
+        materials: &mut Vec<Material>) -> Vec<Self> {
         let dir = obj_file.parent().unwrap();
         let mut file = OpenOptions::new()
             .read(true)
@@ -33,8 +35,7 @@ impl Model {
         let mut text = String::new();
         file.read_to_string(&mut text).unwrap();
 
-        let mut materials = Vec::new();
-        let mut objects: Vec<Object> = Vec::new();
+        let mut objects: Vec<Self> = Vec::new();
         let mut object_name: Option<String> = None;
         let mut pos_verts: Vec<f32> = Vec::new();
         let mut tex_verts: Vec<f32> = Vec::new();
@@ -50,7 +51,7 @@ impl Model {
             match parts[0] {
                 "mtllib" => {
                     let mat_file = dir.join(parts[1]);
-                    materials.append(&mut Material::load(&mat_file));
+                    materials.append(&mut Material::load(&mat_file, textures));
                 },
                 "usemtl" => {
                     for i in 0..materials.len() {
@@ -124,7 +125,7 @@ impl Model {
                                 indices_map.insert(*index, render_index);
                             }
                         }
-                        let object = Object {
+                        let object = Self {
                             name: on,
                             material: mat,
                             vertices: vertices,
@@ -172,7 +173,7 @@ impl Model {
                     indices_map.insert(*index, render_index);
                 }
             }
-            let object = Object {
+            let object = Self {
                 name: on,
                 material: mat,
                 vertices: vertices,
@@ -181,10 +182,7 @@ impl Model {
             objects.push(object);
         }
 
-        Self {
-            objects,
-            materials,
-        }
+        objects
     }
 }
 
@@ -202,18 +200,18 @@ struct Index {
 }
 
 pub struct Material {
-    name: String,
-    ambient: (f32, f32, f32),
-    diffuse: (f32, f32, f32),
-    specular_color: (f32, f32, f32),
-    specular_exponent: f32,
-    dissolve: f32,
+    pub name: String,
+    pub ambient: (f32, f32, f32),
+    pub diffuse: (f32, f32, f32),
+    pub specular_color: (f32, f32, f32),
+    pub specular_exponent: f32,
+    pub dissolve: f32,
     // transmission_filter: (f32, f32, f32),
-    optical_density: f32,
-    diffuse_map: DynamicImage,
-    normal_map: DynamicImage,
-    specular_map: DynamicImage,
-    illumination_model: IlluminationModel,
+    pub optical_density: f32,
+    pub diffuse_map: usize,
+    pub normal_map: usize,
+    pub specular_map: usize,
+    pub illumination_model: IlluminationModel,
 }
 
 impl Debug for Material {
@@ -223,7 +221,7 @@ impl Debug for Material {
 }
 
 impl Material {
-    pub fn load(filename: &PathBuf) -> Vec<Self> {
+    pub fn load(filename: &PathBuf, textures: &mut Vec<Texture>) -> Vec<Self> {
         let mut file = OpenOptions::new()
             .read(true)
             .open(filename)
@@ -242,11 +240,10 @@ impl Material {
         let mut dissolve: Option<f32> = None;
         // let mut transmission_filter: Option<(f32, f32, f32)> = None;
         let mut optical_density: Option<f32> = None;
-        let mut diffuse_map: Option<DynamicImage> = None;
-        let mut specular_map: Option<DynamicImage> = None;
-        let mut normal_map: Option<DynamicImage> = None;
+        let mut diffuse_map: Option<usize> = None;
+        let mut specular_map: Option<usize> = None;
+        let mut normal_map: Option<usize> = None;
         let mut illumination_model: Option<IlluminationModel> = None;
-
 
         for line in text.lines() {
             if line.starts_with("#") {
@@ -313,18 +310,15 @@ impl Material {
                 },
                 "map_Kd" => {
                     let map_file = dir.join(parts[1]);
-                    let map = image::open(map_file).unwrap();
-                    diffuse_map = Some(map);
+                    diffuse_map = Some(load_or_use_texture(textures, map_file));
                 },
                 "map_Ks" => {
                     let map_file = dir.join(parts[1]);
-                    let map = image::open(map_file).unwrap();
-                    specular_map = Some(map);
+                    specular_map = Some(load_or_use_texture(textures, map_file));
                 },
                 "map_Bump" => {
                     let map_file = dir.join(parts[1]);
-                    let map = image::open(map_file).unwrap();
-                    normal_map = Some(map);
+                    normal_map = Some(load_or_use_texture(textures, map_file));
                 },
                 "" => (),
                 _ => {
@@ -351,6 +345,28 @@ impl Material {
         }
         materials
     }
+}
+
+fn load_or_use_texture(textures: &mut Vec<Texture>, file: PathBuf) -> usize {
+    let file_name = file.to_str().unwrap().to_string();
+    for i in 0..textures.len() {
+        if &textures[i].name == &file_name {
+            return i;
+        }
+    }
+    let texture = image::open(&file).unwrap();
+    let index = textures.len();
+    textures.push(Texture {
+        name: file_name,
+        image: texture,
+    });
+    index
+}
+
+#[derive(Debug)]
+pub struct Texture {
+    pub name: String,
+    pub image: DynamicImage,
 }
 
 #[derive(Debug)]

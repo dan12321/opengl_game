@@ -8,13 +8,15 @@ use std::path::PathBuf;
 use cube_renderer::{CubeRenderer, Model};
 use gl;
 use gl::types::*;
-use na::Perspective3;
+use image::DynamicImage;
+use model_loader::{Material, Object, Texture};
+use na::{Matrix4, Perspective3};
 use point_light_renderer::PointLightRenderer;
 use tracing::debug;
 
 use crate::config::{CONTAINER_SPECULAR_TEXTURE, CONTAINER_TEXTURE};
 use crate::shader::PointLight;
-use crate::state::GameState;
+use crate::state::{Cube, GameState, Transform};
 
 use super::config::{
     CUBE_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
@@ -29,6 +31,7 @@ pub struct Renderer {
     light: PointLightRenderer,
     cube: CubeRenderer,
     projection: Perspective3<GLfloat>,
+    cube_example: Vec<Cube>,
 }
 
 impl Renderer {
@@ -54,7 +57,7 @@ impl Renderer {
         let wall_texture = image::open(WALL_TEXTURE).unwrap();
         let container_texture = image::open(CONTAINER_TEXTURE).unwrap();
         let container_specular_texture = image::open(CONTAINER_SPECULAR_TEXTURE).unwrap();
-        let models = vec![
+        let mut models = vec![
             Model {
                 vertices: TEXTURED_CUBE_VERTICES.into(),
                 indices: TEXTURED_CUBE_INDICES.into(),
@@ -64,14 +67,34 @@ impl Renderer {
                 indices: QUAD_INDICES.into(),
             },
         ];
+        let mut textures: Vec<Texture> = Vec::new();
+        let mut materials: Vec<Material> = Vec::new();
+        let objects = model_loader::Object::load(
+            &"assets/models/backpack/backpack.obj".into(),
+            &mut textures,
+            &mut materials,
+        );
+        debug!(model = format!("{:?}", &objects), "loaded model");
 
-        let model = model_loader::Model::load(&"assets/models/backpack/backpack.obj".into());
-        debug!(model = format!("{:?}", model), "loaded model");
+
+        let cube_example = vec![Cube {
+            transform: Transform {
+                position: (0.0, 0.0, 0.0).into(),
+                scale: (1.0, 1.0, 1.0).into(),
+                rotation: Matrix4::identity(),
+            },
+            model: (0..objects.len()).collect(),
+            offset: 0.0,
+        }];
+        let textures: Vec<DynamicImage> = textures.into_iter()
+            .map(|t| t.image)
+            .collect();
         let cube = CubeRenderer::new(
             &cube_vert_shader,
             &texture_frag_shader,
-            models,
-            &[wall_texture, container_texture, container_specular_texture],
+            objects,
+            materials,
+            &textures,
         )
         .unwrap();
 
@@ -79,6 +102,7 @@ impl Renderer {
             light,
             cube,
             projection,
+            cube_example,
         }
     }
 
@@ -89,8 +113,16 @@ impl Renderer {
             state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
+        // self.cube.draw(
+        //     &[state.cubes.as_slice(), &[state.player.cube, state.plane]].concat(),
+        //     &light_uniforms,
+        //     &state.dir_lights,
+        //     &state.camera.position().into(),
+        //     view,
+        //     self.projection.as_matrix().clone(),
+        // );
         self.cube.draw(
-            &[state.cubes.as_slice(), &[state.player.cube, state.plane]].concat(),
+            &self.cube_example,
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),

@@ -14,9 +14,12 @@ use crate::{
     state::{Cube, XYZ},
 };
 
+use super::model_loader::{Material, Object};
+
 pub struct CubeRenderer {
     shader_id: u32,
     parsed_models: Vec<ParsedModel>,
+    materials: Vec<Material>,
     textures: Vec<u32>,
     view_uniform: i32,
     projection_uniform: i32,
@@ -32,7 +35,8 @@ impl CubeRenderer {
     pub fn new(
         vert_shader: &PathBuf,
         frag_shader: &PathBuf,
-        models: Vec<Model>,
+        objects: Vec<Object>,
+        materials: Vec<Material>,
         textures: &[DynamicImage],
     ) -> Result<Self, OpenGLError> {
         unsafe {
@@ -64,9 +68,9 @@ impl CubeRenderer {
             gl::DeleteShader(vert);
             gl::DeleteShader(frag);
 
-            let mut parsed_models = Vec::with_capacity(models.len());
+            let mut parsed_models = Vec::with_capacity(objects.len());
             // Set up vertices and indeces
-            for model in models {
+            for object in objects {
                 let mut vao = 0;
                 let mut vbo = 0;
                 let mut ebo = 0;
@@ -77,15 +81,15 @@ impl CubeRenderer {
                 gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
                 gl::BufferData(
                     gl::ARRAY_BUFFER,
-                    (model.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
-                    &model.vertices[0] as *const _ as *const c_void,
+                    (object.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                    &object.vertices[0] as *const _ as *const c_void,
                     gl::STATIC_DRAW,
                 );
     
                 gl::BufferData(
                     gl::ELEMENT_ARRAY_BUFFER,
-                    (model.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                    &model.indices[0] as *const _ as *const c_void,
+                    (object.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                    &object.indices[0] as *const _ as *const c_void,
                     gl::STATIC_DRAW,
                 );
 
@@ -109,7 +113,8 @@ impl CubeRenderer {
 
                 parsed_models.push(ParsedModel {
                     vao,
-                    indices: model.indices,
+                    indices: object.indices,
+                    material: object.material,
                 });
             }
 
@@ -208,6 +213,7 @@ impl CubeRenderer {
                 offset_uniform,
                 point_light_uniform: point_lights,
                 dir_light_uniform: dir_lights,
+                materials,
             })
         }
     }
@@ -275,47 +281,50 @@ impl CubeRenderer {
             );
 
             for cube in cubes {
-                let model = &self.parsed_models[cube.model];
-                gl::BindVertexArray(model.vao);
-                gl::BufferData(
-                    gl::ELEMENT_ARRAY_BUFFER,
-                    (model.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                    &model.indices[0] as *const _ as *const c_void,
-                    gl::STATIC_DRAW,
-                );
-                gl::ActiveTexture(gl::TEXTURE0);
-                gl::BindTexture(gl::TEXTURE_2D, self.textures[cube.material.texture]);
-                let transform = cube.transform.to_matrix4();
-                gl::UniformMatrix4fv(
-                    self.transformation_uniform,
-                    1,
-                    gl::FALSE,
-                    transform.as_ptr(),
-                );
-                gl::Uniform1f(self.offset_uniform, cube.offset);
-                gl::Uniform3f(
-                    self.material_uniform.ambient,
-                    cube.material.ambient.0,
-                    cube.material.ambient.1,
-                    cube.material.ambient.2,
-                );
-                gl::Uniform3f(
-                    self.material_uniform.diffuse,
-                    cube.material.diffuse.0,
-                    cube.material.diffuse.1,
-                    cube.material.diffuse.2,
-                );
-                // Use Texture1 for specular
-                gl::Uniform1i(self.material_uniform.specular, 1);
-                gl::ActiveTexture(gl::TEXTURE1);
-                gl::BindTexture(gl::TEXTURE_2D, self.textures[cube.material.specular_texture]);
-                gl::Uniform1i(self.material_uniform.shininess, cube.material.shininess);
-                gl::DrawElements(
-                    gl::TRIANGLES,
-                    model.indices.len() as i32,
-                    gl::UNSIGNED_INT,
-                    ptr::null(),
-                );
+                for model_index in &cube.model {
+                    let model = &self.parsed_models[*model_index];
+                    let material = &self.materials[model.material];
+                    gl::BindVertexArray(model.vao);
+                    gl::BufferData(
+                        gl::ELEMENT_ARRAY_BUFFER,
+                        (model.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                        &model.indices[0] as *const _ as *const c_void,
+                        gl::STATIC_DRAW,
+                    );
+                    gl::ActiveTexture(gl::TEXTURE0);
+                    gl::BindTexture(gl::TEXTURE_2D, self.textures[material.diffuse_map]);
+                    let transform = cube.transform.to_matrix4();
+                    gl::UniformMatrix4fv(
+                        self.transformation_uniform,
+                        1,
+                        gl::FALSE,
+                        transform.as_ptr(),
+                    );
+                    gl::Uniform1f(self.offset_uniform, cube.offset);
+                    gl::Uniform3f(
+                        self.material_uniform.ambient,
+                        material.ambient.0,
+                        material.ambient.1,
+                        material.ambient.2,
+                    );
+                    gl::Uniform3f(
+                        self.material_uniform.diffuse,
+                        material.diffuse.0,
+                        material.diffuse.1,
+                        material.diffuse.2,
+                    );
+                    // Use Texture1 for specular
+                    gl::Uniform1i(self.material_uniform.specular, 1);
+                    gl::ActiveTexture(gl::TEXTURE1);
+                    gl::BindTexture(gl::TEXTURE_2D, self.textures[material.specular_map]);
+                    gl::Uniform1i(self.material_uniform.shininess, material.specular_exponent as i32);
+                    gl::DrawElements(
+                        gl::TRIANGLES,
+                        model.indices.len() as i32,
+                        gl::UNSIGNED_INT,
+                        ptr::null(),
+                    );
+                }
             }
             gl::BindVertexArray(0);
         }
@@ -352,6 +361,7 @@ pub struct Model {
 struct ParsedModel {
     vao: u32,
     indices: Vec<u32>,
+    material: usize,
 }
 
 const TRANSFORMATION: &'static CStr =

@@ -56,8 +56,8 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: PLAYER_MATERIAL,
-                    model: 0,
+                    // material: PLAYER_MATERIAL,
+                    model: vec![0],
                     offset: 0.0,
                 },
             },
@@ -68,8 +68,8 @@ impl GameState {
                     scale: (PLANE_WIDTH, 1.0, PLANE_LENGTH).into(),
                     rotation: Matrix4::identity(),
                 },
-                material: BOX_MATERIAL,
-                model: 1,
+                // material: BOX_MATERIAL,
+                model: vec![1],
                 offset: 0.0,
             },
             map,
@@ -284,8 +284,8 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: BOX_MATERIAL,
-                    model: 0,
+                    // material: BOX_MATERIAL,
+                    model: vec![0],
                     offset: 0.0,
                 });
             }
@@ -296,8 +296,8 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: BOX_MATERIAL,
-                    model: 0,
+                    // material: BOX_MATERIAL,
+                    model: vec![0],
                     offset: 0.0,
                 });
             }
@@ -308,8 +308,8 @@ impl GameState {
                         scale: (1.0, 1.0, 1.0).into(),
                         rotation: Matrix4::identity(),
                     },
-                    material: BOX_MATERIAL,
-                    model: 0,
+                    // material: BOX_MATERIAL,
+                    model: vec![0],
                     offset: 0.0,
                 });
             }
@@ -318,11 +318,10 @@ impl GameState {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Cube {
     pub transform: Transform,
-    pub material: Material,
-    pub model: usize,
+    pub model: Vec<usize>,
     pub offset: f32,
 }
 
@@ -346,7 +345,7 @@ impl PointLight {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Player {
     target_lane: usize,
     current_lane: usize,
