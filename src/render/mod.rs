@@ -69,11 +69,17 @@ impl Renderer {
         ];
         let mut textures: Vec<Texture> = Vec::new();
         let mut materials: Vec<Material> = Vec::new();
-        let objects = model_loader::Object::load(
+        let mut objects = model_loader::Object::load(
             &"assets/models/backpack/backpack.obj".into(),
             &mut textures,
             &mut materials,
         );
+        let mut plane = model_loader::Object::load(
+            &"assets/models/plane/plane.obj".into(),
+             &mut textures,
+             &mut materials);
+        
+        objects.append(&mut plane);
         debug!(model = format!("{:?}", &objects), "loaded model");
 
 

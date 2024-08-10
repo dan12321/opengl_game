@@ -209,7 +209,7 @@ pub struct Material {
     // transmission_filter: (f32, f32, f32),
     pub optical_density: f32,
     pub diffuse_map: usize,
-    pub normal_map: usize,
+    // pub normal_map: usize,
     pub specular_map: usize,
     pub illumination_model: IlluminationModel,
 }
@@ -242,7 +242,7 @@ impl Material {
         let mut optical_density: Option<f32> = None;
         let mut diffuse_map: Option<usize> = None;
         let mut specular_map: Option<usize> = None;
-        let mut normal_map: Option<usize> = None;
+        // let mut normal_map: Option<usize> = None;
         let mut illumination_model: Option<IlluminationModel> = None;
 
         for line in text.lines() {
@@ -265,7 +265,7 @@ impl Material {
                             optical_density: optical_density.take().unwrap(),
                             diffuse_map: diffuse_map.take().unwrap(),
                             specular_map: specular_map.take().unwrap(),
-                            normal_map: normal_map.take().unwrap(),
+                            // normal_map: normal_map.take().unwrap(),
                             illumination_model: illumination_model.take().unwrap(),
                         };
                         materials.push(material);
@@ -318,7 +318,7 @@ impl Material {
                 },
                 "map_Bump" => {
                     let map_file = dir.join(parts[1]);
-                    normal_map = Some(load_or_use_texture(textures, map_file));
+                    // normal_map = Some(load_or_use_texture(textures, map_file));
                 },
                 "" => (),
                 _ => {
@@ -338,7 +338,7 @@ impl Material {
                 optical_density: optical_density.take().unwrap(),
                 diffuse_map: diffuse_map.take().unwrap(),
                 specular_map: specular_map.take().unwrap(),
-                normal_map: normal_map.take().unwrap(),
+                // normal_map: normal_map.take().unwrap(),
                 illumination_model: illumination_model.take().unwrap(),
             };
             materials.push(material);
