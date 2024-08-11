@@ -1,4 +1,4 @@
-mod cube_renderer;
+mod model_renderer;
 mod point_light_renderer;
 mod model_loader;
 
@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::path::PathBuf;
 
-use cube_renderer::CubeRenderer;
+use model_renderer::ModelRenderer;
 use gl;
 use gl::types::*;
 use image::DynamicImage;
-use model_loader::{Material, Object, Texture};
+use model_loader::{Material, Mesh, Texture};
 use na::Perspective3;
 use point_light_renderer::PointLightRenderer;
 use tracing::debug;
@@ -19,18 +19,18 @@ use crate::shader::PointLight;
 use crate::state::GameState;
 
 use super::config::{
-    CUBE_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
+    MODEL_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
 };
 use super::shape::{CUBE_INDICES, CUBE_VERTICES};
 
 pub struct Renderer {
     light: PointLightRenderer,
-    cube: CubeRenderer,
+    model: ModelRenderer,
     projection: Perspective3<GLfloat>,
 }
 
 impl Renderer {
-    pub fn new(window_width: u32, window_height: u32) -> (Self, HashMap<String, ModelObjects>) {
+    pub fn new(window_width: u32, window_height: u32) -> (Self, HashMap<String, ModelMeshes>) {
         let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
         let fovy: GLfloat = PI / 2.0;
         let znear: GLfloat = 0.1;
@@ -47,54 +47,54 @@ impl Renderer {
         )
         .unwrap();
 
-        let cube_vert_shader = PathBuf::from(CUBE_VERT_SHADER);
+        let model_vert_shader = PathBuf::from(MODEL_VERT_SHADER);
         let texture_frag_shader = PathBuf::from(TEXTURE_FRAG_SHADER);
 
         // TODO: these should be loaded by a resource loader and passed in
-        // the renderer should not own model_objects
+        // the renderer should not own model_meshes
         let mut textures: Vec<Texture> = Vec::new();
         let mut materials: Vec<Material> = Vec::new();
-        let mut objects: Vec<Object> = Vec::new();
-        let mut model_objects: HashMap<String, ModelObjects> = HashMap::new();
-        let mut backpack = model_loader::Object::load(
+        let mut meshes: Vec<Mesh> = Vec::new();
+        let mut model_meshes: HashMap<String, ModelMeshes> = HashMap::new();
+        let mut backpack = model_loader::Mesh::load(
             &"assets/models/backpack/backpack.obj".into(),
             &mut textures,
             &mut materials,
         );
-        let mut plane = model_loader::Object::load(
+        let mut plane = model_loader::Mesh::load(
             &"assets/models/plane/plane.obj".into(),
              &mut textures,
              &mut materials
         );
-        let mut cube = model_loader::Object::load(
+        let mut cube = model_loader::Mesh::load(
             &"assets/models/cube/cube.obj".into(),
              &mut textures,
              &mut materials
         );
-        model_objects.insert("backpack".to_string(), ModelObjects {
-            start: objects.len(),
-            end: objects.len() + backpack.len(),
+        model_meshes.insert("backpack".to_string(), ModelMeshes {
+            start: meshes.len(),
+            end: meshes.len() + backpack.len(),
         });
-        objects.append(&mut backpack);
-        model_objects.insert("plane".to_string(), ModelObjects {
-            start: objects.len(),
-            end: objects.len() + plane.len(),
+        meshes.append(&mut backpack);
+        model_meshes.insert("plane".to_string(), ModelMeshes {
+            start: meshes.len(),
+            end: meshes.len() + plane.len(),
         });
-        objects.append(&mut plane);
-        model_objects.insert("cube".to_string(), ModelObjects {
-            start: objects.len(),
-            end: objects.len() + cube.len(),
+        meshes.append(&mut plane);
+        model_meshes.insert("cube".to_string(), ModelMeshes {
+            start: meshes.len(),
+            end: meshes.len() + cube.len(),
         });
-        objects.append(&mut cube);
-        debug!(model = format!("{:?}", &objects), "loaded model");
+        meshes.append(&mut cube);
+        debug!(model = format!("{:?}", &meshes), "loaded model");
 
         let textures: Vec<DynamicImage> = textures.into_iter()
             .map(|t| t.image)
             .collect();
-        let cube = CubeRenderer::new(
-            &cube_vert_shader,
+        let model = ModelRenderer::new(
+            &model_vert_shader,
             &texture_frag_shader,
-            objects,
+            meshes,
             materials,
             &textures,
         )
@@ -102,9 +102,9 @@ impl Renderer {
 
         (Self {
             light,
-            cube,
+            model,
             projection,
-        }, model_objects)
+        }, model_meshes)
     }
 
     pub fn render(&self, state: &GameState) {
@@ -114,8 +114,8 @@ impl Renderer {
             state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
-        self.cube.draw(
-            &[state.cubes.as_slice(), &[state.player.cube.clone(), state.plane.clone()]].concat(),
+        self.model.draw(
+            &[state.cubes.as_slice(), &[state.player.model.clone(), state.plane.clone()]].concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),
@@ -125,7 +125,7 @@ impl Renderer {
     }
 }
 
-pub struct ModelObjects {
+pub struct ModelMeshes {
     pub start: usize,
     pub end: usize,
 }

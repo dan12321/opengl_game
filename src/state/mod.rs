@@ -10,18 +10,18 @@ use na::{vector, Matrix4};
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
-use crate::render::ModelObjects;
+use crate::render::ModelMeshes;
 use crate::{file_utils, shader};
 use crate::physics::AABBColider;
 use crate::shader::DirLight;
 
 pub struct GameState {
-    pub cubes: Vec<Cube>,
+    pub cubes: Vec<Model>,
     pub point_lights: Vec<PointLight>,
     pub dir_lights: Vec<DirLight>,
     pub player: Player,
     speed: f32,
-    pub plane: Cube,
+    pub plane: Model,
     pub camera: Camera,
     map: Map,
     pub status: Status,
@@ -29,7 +29,7 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new(level: &PathBuf, model_objects: &HashMap<String, ModelObjects>) -> Self {
+    pub fn new(level: &PathBuf, model_objects: &HashMap<String, ModelMeshes>) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
 
         let full_path = file_utils::get_level_file(level, ".txt");
@@ -56,25 +56,23 @@ impl GameState {
                 target_lane: 1,
                 current_lane: 1,
                 lerp: 1.0,
-                cube: Cube {
+                model: Model {
                     transform: Transform {
                         position: (0.0, 0.0, 0.0).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
-                    model: (backpack_model.start..backpack_model.end).collect(),
-                    offset: 0.0,
+                    meshes: (backpack_model.start..backpack_model.end).collect(),
                 },
             },
             speed: BEAT_SIZE * (map.bpm / 60.0) * map.subdivisions,
-            plane: Cube {
+            plane: Model {
                 transform: Transform {
                     position: (0.0, -0.5, 0.0).into(),
                     scale: (1.0, 1.0, 1.0).into(),
                     rotation: Matrix4::identity(),
                 },
-                model: (plane_model.start..plane_model.end).collect(),
-                offset: 0.0,
+                meshes: (plane_model.start..plane_model.end).collect(),
             },
             map,
             status: Status::Alive,
@@ -133,22 +131,22 @@ impl GameState {
         let movable_width = PLANE_WIDTH / 2.0;
         let start = (self.player.current_lane as f32 - 1.0) * movable_width;
         let end = (self.player.target_lane as f32 - 1.0) * movable_width;
-        self.player.cube.transform.position.x =
+        self.player.model.transform.position.x =
             end * self.player.lerp + start * (1.0 - self.player.lerp);
-        if self.player.cube.transform.position.x > movable_width {
-            self.player.cube.transform.position.x = movable_width;
+        if self.player.model.transform.position.x > movable_width {
+            self.player.model.transform.position.x = movable_width;
         }
-        if self.player.cube.transform.position.x < -movable_width {
-            self.player.cube.transform.position.x = -movable_width;
+        if self.player.model.transform.position.x < -movable_width {
+            self.player.model.transform.position.x = -movable_width;
         }
 
         // plane update
-        self.plane.offset -= self.speed * dt / PLANE_LENGTH;
+        self.plane.transform.position.z += self.speed * dt;
 
         // Check collisions
         let player_collider = AABBColider {
-            position: self.player.cube.transform.position,
-            scale: self.player.cube.transform.scale,
+            position: self.player.model.transform.position,
+            scale: self.player.model.transform.scale,
         };
         for cube in &self.cubes {
             let collider = AABBColider {
@@ -187,10 +185,10 @@ impl GameState {
         }
 
         // player update
-        self.player.cube.transform.position.z += displacement;
+        self.player.model.transform.position.z += displacement;
 
         // plane update
-        self.plane.offset -= displacement / PLANE_LENGTH;
+        self.plane.transform.position.z += displacement;
 
         // controller input
         let reset = controller.buttons().contains(&Button::Restart);
@@ -223,8 +221,8 @@ impl GameState {
     fn resetting_update(&mut self) -> Status {
         self.point_lights = Self::starting_lights();
         self.cubes = Self::starting_cubes(&self.map, &self.cube_model);
-        self.player.cube.transform.position.x = 0.0;
-        self.player.cube.transform.position.z = 0.0;
+        self.player.model.transform.position.x = 0.0;
+        self.player.model.transform.position.z = 0.0;
         self.player.target_lane = 1;
         self.player.current_lane = 1;
         Status::Alive
@@ -277,45 +275,42 @@ impl GameState {
         lights
     }
 
-    fn starting_cubes(map: &Map, cube_model: &Vec<usize>) -> Vec<Cube> {
+    fn starting_cubes(map: &Map, cube_model: &Vec<usize>) -> Vec<Model> {
         let mut cubes = Vec::with_capacity(64);
         for i in 0..map.beats.len() {
             let (l, m, r) = map.beats[i];
             let padding = -(map.start_offset + i as f32) * BEAT_SIZE;
             if l {
-                cubes.push(Cube {
+                cubes.push(Model {
                     transform: Transform {
                         position: (-COLUMN_WIDTH, 0.0, padding).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    model: cube_model.clone(),
-                    offset: 0.0,
+                    meshes: cube_model.clone(),
                 });
             }
             if m {
-                cubes.push(Cube {
+                cubes.push(Model {
                     transform: Transform {
                         position: (0.0, 0.0, padding).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    model: cube_model.clone(),
-                    offset: 0.0,
+                    meshes: cube_model.clone(),
                 });
             }
             if r {
-                cubes.push(Cube {
+                cubes.push(Model {
                     transform: Transform {
                         position: (COLUMN_WIDTH, 0.0, padding).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    model: cube_model.clone(),
-                    offset: 0.0,
+                    meshes: cube_model.clone(),
                 });
             }
         }
@@ -324,10 +319,9 @@ impl GameState {
 }
 
 #[derive(Clone, Debug)]
-pub struct Cube {
+pub struct Model {
     pub transform: Transform,
-    pub model: Vec<usize>,
-    pub offset: f32,
+    pub meshes: Vec<usize>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -355,7 +349,7 @@ pub struct Player {
     target_lane: usize,
     current_lane: usize,
     lerp: f32,
-    pub cube: Cube,
+    pub model: Model,
 }
 
 #[derive(Copy, Clone, Debug)]

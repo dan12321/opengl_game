@@ -11,31 +11,30 @@ use na::Matrix4;
 
 use crate::{
     shader::{create_shader, template_dir_light, template_point_light, DirLight, DirLightProp, OpenGLError, PointLight, PointLightProp},
-    state::{Cube, XYZ},
+    state::{Model, XYZ},
 };
 
-use super::model_loader::{Material, Object};
+use super::model_loader::{Material, Mesh};
 
-pub struct CubeRenderer {
+pub struct ModelRenderer {
     shader_id: u32,
-    parsed_models: Vec<ParsedModel>,
+    parsed_meshes: Vec<ParsedModel>,
     materials: Vec<Material>,
     textures: Vec<u32>,
     view_uniform: i32,
     projection_uniform: i32,
     camera_position_uniform: i32,
     transformation_uniform: i32,
-    offset_uniform: i32,
     material_uniform: MaterialUniform,
     point_light_uniform: [PointLightUniform; MAX_LIGHTS],
     dir_light_uniform: [DirLightUniform; MAX_LIGHTS],
 }
 
-impl CubeRenderer {
+impl ModelRenderer {
     pub fn new(
         vert_shader: &PathBuf,
         frag_shader: &PathBuf,
-        objects: Vec<Object>,
+        meshes: Vec<Mesh>,
         materials: Vec<Material>,
         textures: &[DynamicImage],
     ) -> Result<Self, OpenGLError> {
@@ -68,9 +67,9 @@ impl CubeRenderer {
             gl::DeleteShader(vert);
             gl::DeleteShader(frag);
 
-            let mut parsed_models = Vec::with_capacity(objects.len());
-            // Set up vertices and indeces
-            for object in objects {
+            let mut parsed_models = Vec::with_capacity(meshes.len());
+            // Set up vertices and indices
+            for meshes in meshes {
                 let mut vao = 0;
                 let mut vbo = 0;
                 let mut ebo = 0;
@@ -81,15 +80,15 @@ impl CubeRenderer {
                 gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
                 gl::BufferData(
                     gl::ARRAY_BUFFER,
-                    (object.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
-                    &object.vertices[0] as *const _ as *const c_void,
+                    (meshes.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                    &meshes.vertices[0] as *const _ as *const c_void,
                     gl::STATIC_DRAW,
                 );
     
                 gl::BufferData(
                     gl::ELEMENT_ARRAY_BUFFER,
-                    (object.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                    &object.indices[0] as *const _ as *const c_void,
+                    (meshes.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                    &meshes.indices[0] as *const _ as *const c_void,
                     gl::STATIC_DRAW,
                 );
 
@@ -113,8 +112,8 @@ impl CubeRenderer {
 
                 parsed_models.push(ParsedModel {
                     vao,
-                    indices: object.indices,
-                    material: object.material,
+                    indices: meshes.indices,
+                    material: meshes.material,
                 });
             }
 
@@ -158,8 +157,6 @@ impl CubeRenderer {
             let projection_uniform = gl::GetUniformLocation(program, PROJECTION.as_ptr());
             let view_uniform = gl::GetUniformLocation(program, VIEW.as_ptr());
             let transformation_uniform = gl::GetUniformLocation(program, TRANSFORMATION.as_ptr());
-            let offset_uniform = gl::GetUniformLocation(program, OFFSET.as_ptr());
-
 
             let mut point_lights = [PointLightUniform {
                 position: -1,
@@ -203,14 +200,13 @@ impl CubeRenderer {
             }
             Ok(Self {
                 shader_id: program,
-                parsed_models,
+                parsed_meshes: parsed_models,
                 textures: texture_locations,
                 material_uniform: material,
                 camera_position_uniform,
                 projection_uniform,
                 view_uniform,
                 transformation_uniform,
-                offset_uniform,
                 point_light_uniform: point_lights,
                 dir_light_uniform: dir_lights,
                 materials,
@@ -220,7 +216,7 @@ impl CubeRenderer {
 
     pub fn draw(
         &self,
-        cubes: &[Cube],
+        models: &[Model],
         point_lights: &[PointLight],
         dir_lights: &[DirLight],
         camera_position: &XYZ,
@@ -280,27 +276,26 @@ impl CubeRenderer {
                 camera_position.z,
             );
 
-            for cube in cubes {
-                for model_index in &cube.model {
-                    let model = &self.parsed_models[*model_index];
-                    let material = &self.materials[model.material];
-                    gl::BindVertexArray(model.vao);
+            for model in models {
+                for mesh_index in &model.meshes {
+                    let mesh = &self.parsed_meshes[*mesh_index];
+                    let material = &self.materials[mesh.material];
+                    gl::BindVertexArray(mesh.vao);
                     gl::BufferData(
                         gl::ELEMENT_ARRAY_BUFFER,
-                        (model.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                        &model.indices[0] as *const _ as *const c_void,
+                        (mesh.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                        &mesh.indices[0] as *const _ as *const c_void,
                         gl::STATIC_DRAW,
                     );
                     gl::ActiveTexture(gl::TEXTURE0);
                     gl::BindTexture(gl::TEXTURE_2D, self.textures[material.diffuse_map]);
-                    let transform = cube.transform.to_matrix4();
+                    let transform = model.transform.to_matrix4();
                     gl::UniformMatrix4fv(
                         self.transformation_uniform,
                         1,
                         gl::FALSE,
                         transform.as_ptr(),
                     );
-                    gl::Uniform1f(self.offset_uniform, cube.offset);
                     gl::Uniform3f(
                         self.material_uniform.ambient,
                         material.ambient.0,
@@ -320,7 +315,7 @@ impl CubeRenderer {
                     gl::Uniform1i(self.material_uniform.shininess, material.specular_exponent as i32);
                     gl::DrawElements(
                         gl::TRIANGLES,
-                        model.indices.len() as i32,
+                        mesh.indices.len() as i32,
                         gl::UNSIGNED_INT,
                         ptr::null(),
                     );
@@ -366,7 +361,6 @@ const PROJECTION: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b
 const VIEW: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"view\0") };
 const CAMERA_POSITION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"cameraPosition\0") };
-const OFFSET: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"offset\0") };
 const AMBIENT: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"material.ambient\0") };
 const DIFFUSE: &'static CStr =

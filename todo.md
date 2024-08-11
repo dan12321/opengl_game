@@ -49,9 +49,12 @@
   - [ ] Replace unwraps with proper error handling
   - [ ] Look into porting to android
   - [ ] Make it so the plane moves and repeats
+  - [ ] Refactor to use standard model naming
+    - Node, mesh, scene
   - [ ] Refactor to have resource loader that owns resources and lets other
         areas reference them
       - Load maps (add resource information to maps)
       - Load audio
       - Load models
       - Maybe load scenes onto stack like structure, can refactor to this later
+  - [ ] Can define vertex and use vec of vertices instead of keeping track of offsets. Can even use offsetof to get the offsets when reading

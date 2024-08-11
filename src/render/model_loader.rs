@@ -3,20 +3,20 @@ use std::{collections::HashMap, fmt::Debug, fs::OpenOptions, io::Read, path::Pat
 use image::DynamicImage;
 use tracing::{warn, error};
 
-pub struct Object {
+pub struct Mesh {
     pub name: String,
     pub vertices: Vec<f32>,
     pub indices: Vec<u32>,
     pub material: usize,
 }
 
-impl Debug for Object {
+impl Debug for Mesh {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Object {{ name: {:?}, vertices: {:?}, indices: {:?}, material: {:?} }}", self.name, &self.vertices[0..24], &self.indices[0..3], self.material)
+        write!(f, "Mesh {{ name: {:?}, vertices: {:?}, indices: {:?}, material: {:?} }}", self.name, &self.vertices[0..24], &self.indices[0..3], self.material)
     }
 }
 
-impl Object {
+impl Mesh {
     pub fn load(
         obj_file: &PathBuf,
         textures: &mut Vec<Texture>,
@@ -30,8 +30,8 @@ impl Object {
         let mut text = String::new();
         file.read_to_string(&mut text).unwrap();
 
-        let mut objects: Vec<Self> = Vec::new();
-        let mut object_name: Option<String> = None;
+        let mut meshes: Vec<Self> = Vec::new();
+        let mut mesh_name: Option<String> = None;
         let mut pos_verts: Vec<f32> = Vec::new();
         let mut tex_verts: Vec<f32> = Vec::new();
         let mut norm_verts: Vec<f32> = Vec::new();
@@ -92,8 +92,8 @@ impl Object {
 
                 }
                 "o" => {
-                    if let Some(on) = object_name {
-                        // add object
+                    if let Some(mn) = mesh_name {
+                        // add mesh
                         let mat = material.unwrap();
                         // loop over indices and add verts as needed in
                         // correct format for rendering
@@ -120,15 +120,15 @@ impl Object {
                                 indices_map.insert(*index, render_index);
                             }
                         }
-                        let object = Self {
-                            name: on,
+                        let mesh = Self {
+                            name: mn,
                             material: mat,
                             vertices: vertices,
                             indices: render_indices,
                         };
-                        objects.push(object);
+                        meshes.push(mesh);
                     }
-                    object_name = Some(parts[1].to_string());
+                    mesh_name = Some(parts[1].to_string());
                     // Not sure verts should clear. the indices keep getting
                     // larger
                     indices.clear();
@@ -140,8 +140,8 @@ impl Object {
             }
         }
 
-        if let Some(on) = object_name {
-            // add object
+        if let Some(mn) = mesh_name {
+            // add mesh
             let mat = material.unwrap();
             // loop over indices and add verts as needed in
             // correct format for rendering
@@ -168,16 +168,16 @@ impl Object {
                     indices_map.insert(*index, render_index);
                 }
             }
-            let object = Self {
-                name: on,
+            let mesh = Self {
+                name: mn,
                 material: mat,
                 vertices: vertices,
                 indices: render_indices,
             };
-            objects.push(object);
+            meshes.push(mesh);
         }
 
-        objects
+        meshes
     }
 }
 

@@ -1,5 +1,5 @@
 // Assets
-pub const CUBE_VERT_SHADER: &'static str = "assets/shaders/cube.vert";
+pub const MODEL_VERT_SHADER: &'static str = "assets/shaders/model.vert";
 pub const TEXTURE_FRAG_SHADER: &'static str = "assets/shaders/texture.frag";
 pub const LIGHT_VERT_SHADER: &'static str = "assets/shaders/light.vert";
 pub const LIGHT_FRAG_SHADER: &'static str = "assets/shaders/light.frag";
