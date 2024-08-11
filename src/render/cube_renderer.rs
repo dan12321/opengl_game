@@ -353,11 +353,6 @@ struct MaterialUniform {
     shininess: i32,
 }
 
-pub struct Model {
-    pub vertices: Vec<f32>,
-    pub indices: Vec<u32>,
-}
-
 struct ParsedModel {
     vao: u32,
     indices: Vec<u32>,

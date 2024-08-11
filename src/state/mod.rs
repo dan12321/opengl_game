@@ -13,7 +13,7 @@ use crate::controller::{Button, Controller};
 use crate::render::ModelObjects;
 use crate::{file_utils, shader};
 use crate::physics::AABBColider;
-use crate::shader::{DirLight, Material};
+use crate::shader::DirLight;
 
 pub struct GameState {
     pub cubes: Vec<Cube>,
@@ -26,7 +26,6 @@ pub struct GameState {
     map: Map,
     pub status: Status,
     cube_model: Vec<usize>,
-    plane_model: Vec<usize>,
 }
 
 impl GameState {
@@ -63,7 +62,6 @@ impl GameState {
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
-                    // material: PLAYER_MATERIAL,
                     model: (backpack_model.start..backpack_model.end).collect(),
                     offset: 0.0,
                 },
@@ -75,14 +73,12 @@ impl GameState {
                     scale: (1.0, 1.0, 1.0).into(),
                     rotation: Matrix4::identity(),
                 },
-                // material: BOX_MATERIAL,
                 model: (plane_model.start..plane_model.end).collect(),
                 offset: 0.0,
             },
             map,
             status: Status::Alive,
             cube_model: (cube_model.start..cube_model.end).collect(),
-            plane_model: (plane_model.start..plane_model.end).collect(),
         }
     }
 
@@ -393,22 +389,6 @@ impl Transform {
             * na::Scale3::new(self.scale.x, self.scale.y, self.scale.z).to_homogeneous()
     }
 }
-
-pub static PLAYER_MATERIAL: Material = Material {
-    ambient: (0.1, 0.1, 0.1),
-    diffuse: (0.5, 0.5, 0.5),
-    specular_texture: 2,
-    shininess: 128,
-    texture: 1,
-};
-
-pub static BOX_MATERIAL: Material = Material {
-    ambient: (0.1, 0.1, 0.1),
-    diffuse: (0.5, 0.5, 0.5),
-    specular_texture: 0,
-    shininess: 8,
-    texture: 0,
-};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Status {

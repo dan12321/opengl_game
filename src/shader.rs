@@ -62,15 +62,6 @@ pub enum OpenGLError {
     FailedToLinkProgram(Result<String, FromUtf8Error>),
 }
 
-#[derive(Copy, Clone, Debug)]
-pub struct Material {
-    pub ambient: (f32, f32, f32),
-    pub diffuse: (f32, f32, f32),
-    pub specular_texture: usize,
-    pub shininess: GLint,
-    pub texture: usize,
-}
-
 #[derive(Debug, Copy, Clone)]
 pub struct PointLight {
     pub position: (GLfloat, GLfloat, GLfloat),

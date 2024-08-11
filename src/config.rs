@@ -3,9 +3,6 @@ pub const CUBE_VERT_SHADER: &'static str = "assets/shaders/cube.vert";
 pub const TEXTURE_FRAG_SHADER: &'static str = "assets/shaders/texture.frag";
 pub const LIGHT_VERT_SHADER: &'static str = "assets/shaders/light.vert";
 pub const LIGHT_FRAG_SHADER: &'static str = "assets/shaders/light.frag";
-pub const WALL_TEXTURE: &'static str = "assets/textures/scifiwall.jpg";
-pub const CONTAINER_TEXTURE: &'static str = "assets/textures/container.png";
-pub const CONTAINER_SPECULAR_TEXTURE: &'static str = "assets/textures/container_specular.png";
 
 // Movement
 pub const MOVE_SPEED: f32 = 15.0;

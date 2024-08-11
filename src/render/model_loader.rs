@@ -1,12 +1,7 @@
 use std::{collections::HashMap, fmt::Debug, fs::OpenOptions, io::Read, path::PathBuf};
 
 use image::DynamicImage;
-use tracing::{warn, error, debug};
-
-#[derive(Debug)]
-pub struct Model {
-    pub objects: Vec<Object>,
-}
+use tracing::{warn, error};
 
 pub struct Object {
     pub name: String,
@@ -56,7 +51,7 @@ impl Object {
                 "usemtl" => {
                     for i in 0..materials.len() {
                         if materials[i].name == parts[1] {
-                            if let Some(m) = material {
+                            if let Some(_) = material {
                                 warn!("second-material-use");
                             }
                             material = Some(i);
@@ -317,7 +312,7 @@ impl Material {
                     specular_map = Some(load_or_use_texture(textures, map_file));
                 },
                 "map_Bump" => {
-                    let map_file = dir.join(parts[1]);
+                    //let map_file = dir.join(parts[1]);
                     // normal_map = Some(load_or_use_texture(textures, map_file));
                 },
                 "" => (),
@@ -370,7 +365,7 @@ pub struct Texture {
 }
 
 #[derive(Debug)]
-enum IlluminationModel {
+pub enum IlluminationModel {
     ColorOnAmbientOff,
     ColorOnAmbientOn,
     HighlightOn,
