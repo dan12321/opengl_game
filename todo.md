@@ -51,3 +51,7 @@
   - [ ] Make it so the plane moves and repeats
   - [ ] Refactor to have resource loader that owns resources and lets other
         areas reference them
+      - Load maps (add resource information to maps)
+      - Load audio
+      - Load models
+      - Maybe load scenes onto stack like structure, can refactor to this later
