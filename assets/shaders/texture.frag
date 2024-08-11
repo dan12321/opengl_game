@@ -65,7 +65,7 @@ vec3 CalcPointLight(PointLight light, vec2 texCoord, vec3 normal, vec3 fragPos, 
     vec3 diffuse = distanceFallOff * diffuseIntensity * material.diffuse * light.diffuse;
 
     vec3 reflectDir = reflect(-lightDir, normal);
-    float specularIntensity = distanceFallOff * pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
+    float specularIntensity = distanceFallOff * min(1.0, pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess));
     vec3 specular = specularIntensity * light.specular * texture2D(material.specular, texCoord).rgb;
 
     return specular + diffuse;
@@ -77,7 +77,7 @@ vec3 CalcDirLight(DirLight light, vec2 texCoord, vec3 normal, vec3 cameraDir)
     vec3 diffuse = diffuseIntensity * material.diffuse * light.diffuse;
 
     vec3 reflectDir = reflect(-light.direction, normal);
-    float specularIntensity = pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess);
+    float specularIntensity = min(pow(max(dot(cameraDir, reflectDir), 0.0), material.shininess), 1);
     vec3 specular = specularIntensity * light.specular * texture2D(material.specular, texCoord).rgb;
 
     return specular + diffuse;
