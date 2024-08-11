@@ -58,7 +58,7 @@ impl GameState {
                 lerp: 1.0,
                 model: Model {
                     transform: Transform {
-                        position: (0.0, 0.0, 0.0).into(),
+                        position: (0.0, 0.75, 0.0).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
