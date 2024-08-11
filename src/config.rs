@@ -17,8 +17,8 @@ pub const SCROLL_ZOOM_SCALE: f32 = 1.0 / 5.0;
 pub const MAX_ZOOM: f32 = 10.0;
 pub const MIN_ZOOM: f32 = -5.0;
 pub const BEAT_SIZE: f32 = 5.0;
-pub const COLUMN_WIDTH: f32 = 1.75;
+pub const COLUMN_WIDTH: f32 = 2.2;
 
 // PLANE
-pub const PLANE_WIDTH: f32 = 5.0;
+pub const PLANE_WIDTH: f32 = 4.3;
 pub const PLANE_LENGTH: f32 = 100.0;

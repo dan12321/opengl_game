@@ -67,10 +67,10 @@ fn main() {
 
     // Program Setup
     let sad_level = "assets/maps/sad";
-    let mut state = GameState::new(&sad_level.into());
+    let (renderer, model_objects) = Renderer::new(window_width, window_height);
+    let mut state = GameState::new(&sad_level.into(), &model_objects);
     let mut last_status = state.status;
     let mut controller = Controller::new(&mut glfw, events);
-    let renderer = Renderer::new(window_width, window_height);
     let mut audio = Audio::new();
     let sad_level_song = file_utils::get_level_file(&sad_level.into(), ".wav");
     let death_track = audio.add_wav(&"assets/sounds/test.wav".into());
@@ -94,7 +94,7 @@ fn main() {
             match button {
                 Button::Quit => window.set_should_close(true),
                 Button::Level1 => {
-                    state = GameState::new(&sad_level.into());
+                    state = GameState::new(&sad_level.into(), &model_objects);
                     match upbeat_track {
                         Some(track) => {
                             audio.track_action(audio::Action::Stop(track));
@@ -105,7 +105,7 @@ fn main() {
                     audio.track_action(audio::Action::Play(sad_song_track));
                 },
                 Button::Level2 => {
-                    state = GameState::new(&upbeat_level.into());
+                    state = GameState::new(&upbeat_level.into(), &model_objects);
                     audio.track_action(audio::Action::Stop(sad_song_track));
                     let track = match upbeat_track {
                         Some(t) => t,

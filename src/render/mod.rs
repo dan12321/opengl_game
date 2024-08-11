@@ -2,6 +2,7 @@ mod cube_renderer;
 mod point_light_renderer;
 mod model_loader;
 
+use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::path::PathBuf;
 
@@ -35,7 +36,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window_width: u32, window_height: u32) -> Self {
+    pub fn new(window_width: u32, window_height: u32) -> (Self, HashMap<String, ModelObjects>) {
         let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
         let fovy: GLfloat = PI / 2.0;
         let znear: GLfloat = 0.1;
@@ -67,9 +68,14 @@ impl Renderer {
                 indices: QUAD_INDICES.into(),
             },
         ];
+
+        // TODO: these should be loaded by a resource loader and passed in
+        // the renderer should not own model_objects
         let mut textures: Vec<Texture> = Vec::new();
         let mut materials: Vec<Material> = Vec::new();
-        let mut objects = model_loader::Object::load(
+        let mut objects: Vec<Object> = Vec::new();
+        let mut model_objects: HashMap<String, ModelObjects> = HashMap::new();
+        let mut backpack = model_loader::Object::load(
             &"assets/models/backpack/backpack.obj".into(),
             &mut textures,
             &mut materials,
@@ -77,9 +83,28 @@ impl Renderer {
         let mut plane = model_loader::Object::load(
             &"assets/models/plane/plane.obj".into(),
              &mut textures,
-             &mut materials);
-        
+             &mut materials
+        );
+        let mut cube = model_loader::Object::load(
+            &"assets/models/cube/cube.obj".into(),
+             &mut textures,
+             &mut materials
+        );
+        model_objects.insert("backpack".to_string(), ModelObjects {
+            start: objects.len(),
+            end: objects.len() + backpack.len(),
+        });
+        objects.append(&mut backpack);
+        model_objects.insert("plane".to_string(), ModelObjects {
+            start: objects.len(),
+            end: objects.len() + plane.len(),
+        });
         objects.append(&mut plane);
+        model_objects.insert("cube".to_string(), ModelObjects {
+            start: objects.len(),
+            end: objects.len() + cube.len(),
+        });
+        objects.append(&mut cube);
         debug!(model = format!("{:?}", &objects), "loaded model");
 
 
@@ -104,12 +129,12 @@ impl Renderer {
         )
         .unwrap();
 
-        Self {
+        (Self {
             light,
             cube,
             projection,
             cube_example,
-        }
+        }, model_objects)
     }
 
     pub fn render(&self, state: &GameState) {
@@ -119,23 +144,28 @@ impl Renderer {
             state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
-        // self.cube.draw(
-        //     &[state.cubes.as_slice(), &[state.player.cube, state.plane]].concat(),
-        //     &light_uniforms,
-        //     &state.dir_lights,
-        //     &state.camera.position().into(),
-        //     view,
-        //     self.projection.as_matrix().clone(),
-        // );
         self.cube.draw(
-            &self.cube_example,
+            &[state.cubes.as_slice(), &[state.player.cube.clone(), state.plane.clone()]].concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),
             view,
             self.projection.as_matrix().clone(),
         );
+        // self.cube.draw(
+        //     &self.cube_example,
+        //     &light_uniforms,
+        //     &state.dir_lights,
+        //     &state.camera.position().into(),
+        //     view,
+        //     self.projection.as_matrix().clone(),
+        // );
     }
+}
+
+pub struct ModelObjects {
+    pub start: usize,
+    pub end: usize,
 }
 
 fn clear() {

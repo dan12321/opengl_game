@@ -1,5 +1,6 @@
 mod map;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -9,6 +10,7 @@ use na::{vector, Matrix4};
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
+use crate::render::ModelObjects;
 use crate::{file_utils, shader};
 use crate::physics::AABBColider;
 use crate::shader::{DirLight, Material};
@@ -23,16 +25,20 @@ pub struct GameState {
     pub camera: Camera,
     map: Map,
     pub status: Status,
+    cube_model: Vec<usize>,
+    plane_model: Vec<usize>,
 }
 
 impl GameState {
-    pub fn new(level: &PathBuf) -> Self {
+    pub fn new(level: &PathBuf, model_objects: &HashMap<String, ModelObjects>) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
 
         let full_path = file_utils::get_level_file(level, ".txt");
         let map = Map::from_file(&full_path);
+        let cube_model = model_objects.get("cube").unwrap();
+        let plane_model = model_objects.get("plane").unwrap();
 
-        let cubes = Self::starting_cubes(&map);
+        let cubes = Self::starting_cubes(&map, &(cube_model.start..cube_model.end).collect());
         let lights = Self::starting_lights();
 
         GameState {
@@ -53,11 +59,11 @@ impl GameState {
                 cube: Cube {
                     transform: Transform {
                         position: (0.0, 0.0, 0.0).into(),
-                        scale: (1.0, 1.0, 1.0).into(),
+                        scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: PLAYER_MATERIAL,
-                    model: vec![0],
+                    model: (cube_model.start..cube_model.end).collect(),
                     offset: 0.0,
                 },
             },
@@ -65,15 +71,17 @@ impl GameState {
             plane: Cube {
                 transform: Transform {
                     position: (0.0, -0.5, 0.0).into(),
-                    scale: (PLANE_WIDTH, 1.0, PLANE_LENGTH).into(),
+                    scale: (1.0, 1.0, 1.0).into(),
                     rotation: Matrix4::identity(),
                 },
                 // material: BOX_MATERIAL,
-                model: vec![1],
+                model: (plane_model.start..plane_model.end).collect(),
                 offset: 0.0,
             },
             map,
             status: Status::Alive,
+            cube_model: (cube_model.start..cube_model.end).collect(),
+            plane_model: (plane_model.start..plane_model.end).collect(),
         }
     }
 
@@ -125,11 +133,11 @@ impl GameState {
             self.player.lerp = 1.0;
         }
 
-        let start = (self.player.current_lane as f32 - 1.0) * 1.75;
-        let end = (self.player.target_lane as f32 - 1.0) * 1.75;
+        let movable_width = PLANE_WIDTH / 2.0;
+        let start = (self.player.current_lane as f32 - 1.0) * movable_width;
+        let end = (self.player.target_lane as f32 - 1.0) * movable_width;
         self.player.cube.transform.position.x =
             end * self.player.lerp + start * (1.0 - self.player.lerp);
-        let movable_width = PLANE_WIDTH / 2.0 - 0.5;
         if self.player.cube.transform.position.x > movable_width {
             self.player.cube.transform.position.x = movable_width;
         }
@@ -217,7 +225,7 @@ impl GameState {
 
     fn resetting_update(&mut self) -> Status {
         self.point_lights = Self::starting_lights();
-        self.cubes = Self::starting_cubes(&self.map);
+        self.cubes = Self::starting_cubes(&self.map, &self.cube_model);
         self.player.cube.transform.position.x = 0.0;
         self.player.cube.transform.position.z = 0.0;
         self.player.target_lane = 1;
@@ -229,8 +237,8 @@ impl GameState {
         let mut lights = Vec::with_capacity(64);
         for i in 0..=4 {
             let n = i as f32;
-            let x = ((n / 4.0) * PLANE_WIDTH - (PLANE_WIDTH / 2.0)) * 1.2;
-            let y = (-n * n + 4.0 * n) + 1.0;
+            let x = ((n / 4.0) * PLANE_WIDTH - (PLANE_WIDTH / 2.0)) * 1.75;
+            let y = (-n * n + 4.0 * n) + 3.0;
             let light1_transform = Transform {
                 position: (x, y, -10.0).into(),
                 scale: (0.5, 0.5, 0.5).into(),
@@ -272,7 +280,7 @@ impl GameState {
         lights
     }
 
-    fn starting_cubes(map: &Map) -> Vec<Cube> {
+    fn starting_cubes(map: &Map, cube_model: &Vec<usize>) -> Vec<Cube> {
         let mut cubes = Vec::with_capacity(64);
         for i in 0..map.beats.len() {
             let (l, m, r) = map.beats[i];
@@ -281,11 +289,11 @@ impl GameState {
                 cubes.push(Cube {
                     transform: Transform {
                         position: (-COLUMN_WIDTH, 0.0, padding).into(),
-                        scale: (1.0, 1.0, 1.0).into(),
+                        scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    model: vec![0],
+                    model: cube_model.clone(),
                     offset: 0.0,
                 });
             }
@@ -293,11 +301,11 @@ impl GameState {
                 cubes.push(Cube {
                     transform: Transform {
                         position: (0.0, 0.0, padding).into(),
-                        scale: (1.0, 1.0, 1.0).into(),
+                        scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    model: vec![0],
+                    model: cube_model.clone(),
                     offset: 0.0,
                 });
             }
@@ -305,11 +313,11 @@ impl GameState {
                 cubes.push(Cube {
                     transform: Transform {
                         position: (COLUMN_WIDTH, 0.0, padding).into(),
-                        scale: (1.0, 1.0, 1.0).into(),
+                        scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    model: vec![0],
+                    model: cube_model.clone(),
                     offset: 0.0,
                 });
             }
