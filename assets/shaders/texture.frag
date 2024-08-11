@@ -36,6 +36,7 @@ out vec4 FragColor;
 
 vec3 CalcPointLight(PointLight light, vec2 texCoord, vec3 normal, vec3 fragPos, vec3 cameraDir);
 vec3 CalcDirLight(DirLight light, vec2 texCoord, vec3 normal, vec3 cameraDir);
+float LinearDepth(float depth, float near, float far);
 void main()
 {
     vec2 texCoord = TexCoord.xy;
@@ -51,7 +52,7 @@ void main()
         color += CalcDirLight(dirLights[i], texCoord, Normal, cameraDir);
     }
 
-    FragColor = vec4(color, 1.0) * tex;
+    FragColor = vec4(color, 1.0) * tex * LinearDepth(gl_FragCoord.z, 0.1, 50.0);
 }
 
 vec3 CalcPointLight(PointLight light, vec2 texCoord, vec3 normal, vec3 fragPos, vec3 cameraDir)
@@ -80,4 +81,10 @@ vec3 CalcDirLight(DirLight light, vec2 texCoord, vec3 normal, vec3 cameraDir)
     vec3 specular = specularIntensity * light.specular * texture2D(material.specular, texCoord).rgb;
 
     return specular + diffuse;
+}
+
+float LinearDepth(float depth, float near, float far) {
+    float ndc = depth * 2.0 - 1.0;
+    float linear = (2.0 * near * far) / (far + near - ndc * (far - near));
+    return -(linear / far) + 1.0;
 }
