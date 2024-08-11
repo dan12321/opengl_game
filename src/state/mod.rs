@@ -21,7 +21,7 @@ pub struct GameState {
     pub dir_lights: Vec<DirLight>,
     pub player: Player,
     speed: f32,
-    pub plane: Model,
+    pub plane: Plane,
     pub camera: Camera,
     map: Map,
     pub status: Status,
@@ -66,13 +66,33 @@ impl GameState {
                 },
             },
             speed: BEAT_SIZE * (map.bpm / 60.0) * map.subdivisions,
-            plane: Model {
-                transform: Transform {
-                    position: (0.0, -0.5, 0.0).into(),
-                    scale: (1.0, 1.0, 1.0).into(),
-                    rotation: Matrix4::identity(),
-                },
-                meshes: (plane_model.start..plane_model.end).collect(),
+            plane: Plane {
+                models: [
+                    Model {
+                        transform: Transform {
+                            position: (0.0, -0.5, 0.0).into(),
+                            scale: (1.0, 1.0, 1.0).into(),
+                            rotation: Matrix4::identity(),
+                        },
+                        meshes: (plane_model.start..plane_model.end).collect(),
+                    },
+                    Model {
+                        transform: Transform {
+                            position: (0.0, -0.5, -PLANE_LENGTH).into(),
+                            scale: (1.0, 1.0, 1.0).into(),
+                            rotation: Matrix4::identity(),
+                        },
+                        meshes: (plane_model.start..plane_model.end).collect(),
+                    },
+                    Model {
+                        transform: Transform {
+                            position: (0.0, -0.5, -PLANE_LENGTH * 2.0).into(),
+                            scale: (1.0, 1.0, 1.0).into(),
+                            rotation: Matrix4::identity(),
+                        },
+                        meshes: (plane_model.start..plane_model.end).collect(),
+                    }
+                ]
             },
             map,
             status: Status::Alive,
@@ -141,7 +161,7 @@ impl GameState {
         }
 
         // plane update
-        self.plane.transform.position.z += self.speed * dt;
+        self.plane.displace(self.speed * dt);
 
         // Check collisions
         let player_collider = AABBColider {
@@ -188,7 +208,7 @@ impl GameState {
         self.player.model.transform.position.z += displacement;
 
         // plane update
-        self.plane.transform.position.z += displacement;
+        self.plane.displace(displacement);
 
         // controller input
         let reset = controller.buttons().contains(&Button::Restart);
@@ -340,6 +360,21 @@ impl PointLight {
             diffuse: self.diffuse,
             specular: self.specular,
             strength: self.strength,
+        }
+    }
+}
+
+pub struct Plane {
+    pub models: [Model; 3],
+}
+
+impl Plane {
+    fn displace(&mut self, z: f32) {
+        for p in &mut self.models {
+            p.transform.position.z += z;
+            if p.transform.position.z >= PLANE_LENGTH {
+                p.transform.position.z -= PLANE_LENGTH * 2.0;
+            }
         }
     }
 }

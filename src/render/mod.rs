@@ -115,7 +115,7 @@ impl Renderer {
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
         self.model.draw(
-            &[state.cubes.as_slice(), &[state.player.model.clone(), state.plane.clone()]].concat(),
+            &[state.cubes.as_slice(), &[state.player.model.clone()], state.plane.models.as_slice()].concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),

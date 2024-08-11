@@ -18,4 +18,4 @@ pub const COLUMN_WIDTH: f32 = 2.2;
 
 // PLANE
 pub const PLANE_WIDTH: f32 = 4.3;
-pub const PLANE_LENGTH: f32 = 100.0;
+pub const PLANE_LENGTH: f32 = 201.05;
