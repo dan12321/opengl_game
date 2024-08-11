@@ -37,6 +37,7 @@ impl GameState {
         let map = Map::from_file(&full_path);
         let cube_model = model_objects.get("cube").unwrap();
         let plane_model = model_objects.get("plane").unwrap();
+        let backpack_model = model_objects.get("backpack").unwrap();
 
         let cubes = Self::starting_cubes(&map, &(cube_model.start..cube_model.end).collect());
         let lights = Self::starting_lights();
@@ -63,7 +64,7 @@ impl GameState {
                         rotation: Matrix4::identity(),
                     },
                     // material: PLAYER_MATERIAL,
-                    model: (cube_model.start..cube_model.end).collect(),
+                    model: (backpack_model.start..backpack_model.end).collect(),
                     offset: 0.0,
                 },
             },
