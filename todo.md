@@ -48,4 +48,6 @@
 - [ ] Misc
   - [ ] Replace unwraps with proper error handling
   - [ ] Look into porting to android
-  - [ ] Make it so the plane repeats instead of stretching
+  - [ ] Make it so the plane moves and repeats
+  - [ ] Refactor to have resource loader that owns resources and lets other
+        areas reference them
