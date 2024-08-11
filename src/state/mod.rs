@@ -273,19 +273,19 @@ impl GameState {
                 transform: light1_transform,
                 diffuse: (1.0, 1.0, 0.75),
                 specular: (1.0, 1.0, 0.75),
-                strength: 10.0,
+                strength: 5.0,
             };
             let light2 = PointLight {
                 transform: light2_transform,
                 diffuse: (1.0, 1.0, 0.75),
                 specular: (1.0, 1.0, 0.75),
-                strength: 10.0,
+                strength: 5.0,
             };
             let light3 = PointLight {
                 transform: light3_transform,
                 diffuse: (1.0, 1.0, 0.75),
                 specular: (1.0, 1.0, 0.75),
-                strength: 10.0,
+                strength: 5.0,
             };
             lights.push(light1);
             lights.push(light2);
