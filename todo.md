@@ -45,6 +45,7 @@
     - Wait for input and restart song
   - [ ] Move camera slightly with movement
   - [ ] Tilt camera up slightly so it looks ahead of the player
+  - [ ] Make spacing of tiles match beat (maybe load separate to plane)
 - [ ] Misc
   - [ ] Replace unwraps with proper error handling
   - [ ] Look into porting to android
