@@ -1,20 +1,19 @@
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{c_void, CStr},
     mem,
     path::PathBuf,
     ptr,
 };
 
 use gl::types::*;
-use image::{ColorType, DynamicImage};
 use na::Matrix4;
 
 use crate::{
-    shader::{create_shader, template_dir_light, template_point_light, DirLight, DirLightProp, OpenGLError, PointLight, PointLightProp},
-    state::{Model, XYZ},
+    shader::{create_shader, OpenGLError},
+    state::Model,
 };
 
-use super::model_loader::{Material, Mesh};
+use super::model_loader::Mesh;
 
 pub struct OutlineRenderer {
     shader_id: u32,
