@@ -1,6 +1,7 @@
 mod model_renderer;
 mod point_light_renderer;
 mod model_loader;
+mod outline_renderer;
 
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -12,9 +13,11 @@ use gl::types::*;
 use image::DynamicImage;
 use model_loader::{Material, Mesh, Texture};
 use na::Perspective3;
+use outline_renderer::OutlineRenderer;
 use point_light_renderer::PointLightRenderer;
 use tracing::debug;
 
+use crate::config::{OUTLINE_FRAG_SHADER, OUTLINE_VERT_SHADER};
 use crate::shader::PointLight;
 use crate::state::GameState;
 
@@ -27,10 +30,15 @@ pub struct Renderer {
     light: PointLightRenderer,
     model: ModelRenderer,
     projection: Perspective3<GLfloat>,
+    outline: OutlineRenderer,
 }
 
 impl Renderer {
     pub fn new(window_width: u32, window_height: u32) -> (Self, HashMap<String, ModelMeshes>) {
+        unsafe {
+            gl::Enable(gl::DEPTH_TEST);
+            gl::Enable(gl::STENCIL_TEST);
+        }
         let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
         let fovy: GLfloat = PI / 2.0;
         let znear: GLfloat = 0.1;
@@ -49,6 +57,8 @@ impl Renderer {
 
         let model_vert_shader = PathBuf::from(MODEL_VERT_SHADER);
         let texture_frag_shader = PathBuf::from(TEXTURE_FRAG_SHADER);
+        let outline_vert_shader = PathBuf::from(OUTLINE_VERT_SHADER);
+        let outline_frag_shader = PathBuf::from(OUTLINE_FRAG_SHADER);
 
         // TODO: these should be loaded by a resource loader and passed in
         // the renderer should not own model_meshes
@@ -91,6 +101,13 @@ impl Renderer {
         let textures: Vec<DynamicImage> = textures.into_iter()
             .map(|t| t.image)
             .collect();
+        
+        let outline = OutlineRenderer::new(
+            &outline_vert_shader,
+            &outline_frag_shader,
+            &meshes,
+        ).unwrap();
+
         let model = ModelRenderer::new(
             &model_vert_shader,
             &texture_frag_shader,
@@ -104,24 +121,60 @@ impl Renderer {
             light,
             model,
             projection,
+            outline,
         }, model_meshes)
     }
 
     pub fn render(&self, state: &GameState) {
         clear();
+        unsafe {
+            gl::Enable(gl::DEPTH_TEST);
+            gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
+            gl::StencilMask(0x00);
+        }
         let view = state.camera.transform();
         let light_uniforms: Vec<PointLight> =
             state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
+
+        // Non stenciled models
         self.model.draw(
-            &[state.cubes.as_slice(), &[state.player.model.clone()], state.plane.models.as_slice()].concat(),
+            &[&[state.player.model.clone()], state.plane.models.as_slice()].concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),
             view,
             self.projection.as_matrix().clone(),
         );
+
+        // Stenciled Models
+        unsafe {
+            gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
+            gl::StencilMask(0xFF);
+        }
+        self.model.draw(
+            state.cubes.as_slice(),
+            &light_uniforms,
+            &state.dir_lights,
+            &state.camera.position().into(),
+            view,
+            self.projection.as_matrix().clone(),
+        );
+        unsafe {
+            gl::StencilFunc(gl::NOTEQUAL, 1, 0xFF);
+            gl::StencilMask(0x00);
+            gl::Disable(gl::DEPTH_TEST);
+        }
+        self.outline.draw(
+            state.cubes.as_slice(),
+            view,
+            self.projection.as_matrix().clone());
+        unsafe {
+            gl::StencilMask(0xFF);
+            gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
+            gl::Enable(gl::DEPTH_TEST);
+        }
     }
 }
 
@@ -133,6 +186,6 @@ pub struct ModelMeshes {
 fn clear() {
     unsafe {
         gl::ClearColor(0.0, 0.0, 0.0, 1.0);
-        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
     }
 }
