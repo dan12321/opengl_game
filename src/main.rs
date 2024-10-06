@@ -17,7 +17,7 @@ extern crate tracing_subscriber;
 
 use std::time::Instant;
 
-use audio::Audio;
+use audio::{Audio, AudioBuilder};
 use controller::{Button, Controller};
 use glfw::Context;
 use render::Renderer;
@@ -61,9 +61,6 @@ fn main() {
 
     // OpenGL Setup
     gl::load_with(|s| window.get_proc_address(s));
-    unsafe {
-        gl::Enable(gl::DEPTH_TEST);
-    }
 
     // Program Setup
     let sad_level = "assets/maps/sad";
@@ -71,13 +68,14 @@ fn main() {
     let mut state = GameState::new(&sad_level.into(), &model_objects);
     let mut last_status = state.status;
     let mut controller = Controller::new(&mut glfw, events);
-    let mut audio = Audio::new();
+    let mut audio_builder = AudioBuilder::new();
     let sad_level_song = file_utils::get_level_file(&sad_level.into(), ".wav");
-    let death_track = audio.add_wav(&"assets/sounds/test.wav".into());
-    let sad_song_track = audio.add_wav(&sad_level_song);
+    let death_track = audio_builder.add_wav(&"assets/sounds/test.wav".into());
+    let sad_song_track = audio_builder.add_wav(&sad_level_song);
     let upbeat_level = "assets/maps/upbeat";
     let upbeat_level_song = file_utils::get_level_file(&upbeat_level.into(), ".wav");
-    let mut upbeat_track: Option<usize> = None;
+    let upbeat_track: usize = audio_builder.add_wav(&upbeat_level_song);
+    let audio = audio_builder.build();
     let mut current_track = sad_song_track;
 
     let mut last_time = Instant::now();
@@ -95,26 +93,14 @@ fn main() {
                 Button::Quit => window.set_should_close(true),
                 Button::Level1 => {
                     state = GameState::new(&sad_level.into(), &model_objects);
-                    match upbeat_track {
-                        Some(track) => {
-                            audio.track_action(audio::Action::Stop(track));
-                        },
-                        None => (),
-                    }
+                    audio.track_action(audio::Action::Stop(upbeat_track));
                     current_track = sad_song_track;
                     audio.track_action(audio::Action::Play(sad_song_track));
                 },
                 Button::Level2 => {
                     state = GameState::new(&upbeat_level.into(), &model_objects);
                     audio.track_action(audio::Action::Stop(sad_song_track));
-                    let track = match upbeat_track {
-                        Some(t) => t,
-                        None => {
-                            let t = audio.add_wav(&upbeat_level_song);
-                            upbeat_track = Some(t);
-                            t
-                        },
-                    };
+                    let track = upbeat_track;
                     last_time = Instant::now();
                     current_time = Instant::now();
                     delta_time = current_time.duration_since(last_time);

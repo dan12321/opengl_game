@@ -1,19 +1,27 @@
-use std::{fs::OpenOptions, io::Read, path::PathBuf};
+use std::{collections::VecDeque, fs::{File, OpenOptions}, io::{BufReader, Read}, path::PathBuf, sync::RwLock};
 
 use tracing::debug;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Wav {
-    pub samples: Vec<f64>,
+    // TODO: Rethink this structure, starting to feel like a recipe for
+    // deadlocks. Maybe get_next_audio_value can be made dumber and just
+    // read off of a channel being populated by the mixer?
+    pub reader: RwLock<BufReader<File>>,
+    pub samples: RwLock<VecDeque<f64>>,
     pub sample_rate: u32,
+    pub sample_size: u32,
+    pub chunk_size: usize,
+    pub ended: bool,
 }
 
 impl Wav {
     pub fn new(path: &PathBuf) -> Self {
-        let mut file = OpenOptions::new().read(true).open(&path).unwrap();
+        let file = OpenOptions::new().read(true).open(&path).unwrap();
+        let mut reader = BufReader::new(file);
 
         let mut file_header: [u8; 44] = [0; 44];
-        file.read(&mut file_header).unwrap();
+        reader.read(&mut file_header).unwrap();
 
         let correct_subtype = &file_header[0..4] == b"RIFF";
         let correct_filetype = &file_header[8..12] == b"WAVE";
@@ -36,7 +44,7 @@ impl Wav {
         unsafe {
             sample_buffer.set_len(data_size as usize);
         }
-        let num = file.read(&mut sample_buffer).unwrap();
+        let num = reader.read(&mut sample_buffer).unwrap();
         debug!(
             correct_subtype = correct_subtype,
             correct_filetype = correct_filetype,
@@ -54,11 +62,48 @@ impl Wav {
             "open wav file",
         );
         // assume 1 chanel for now
-        let samples = parse_samples(&sample_buffer);
+        // let samples = parse_samples(&sample_buffer);
+        let chunk_size = 1024;
+        let samples = VecDeque::with_capacity(chunk_size * 2);
         Wav {
-            samples,
+            reader: RwLock::new(reader),
+            samples: RwLock::new(samples),
             sample_rate,
+            sample_size: bytes_per_second / sample_rate,
+            chunk_size,
+            ended: false,
         }
+    }
+
+    pub fn get_next(&self) -> f64 {
+        let samples_len = {
+            self.samples.read().unwrap().len()
+        };
+        if samples_len < self.chunk_size / 2 {
+            let mut next_chunk = self.parse_chunk();
+            self.samples.write()
+                .unwrap()
+                .append(&mut next_chunk);
+            // self.ended = next_chunk.len() == 0;
+        }
+        self.samples.write()
+            .unwrap()
+            .pop_front()
+            .unwrap_or(0.0)
+    }
+
+    fn parse_chunk(&self) -> VecDeque<f64> {
+        let num_bytes = self.chunk_size * 2;
+        let mut bytes = vec![0; num_bytes];
+        let n = self.reader.write().unwrap().read(&mut bytes).unwrap();
+        let mut res = VecDeque::with_capacity(self.chunk_size);
+        for i in 0..(n / 2) {
+            let pos = i * 2;
+            let byte: [u8; 2] = read_from_buffer(&bytes[pos..pos + 2]);
+            let int = i16::from_le_bytes(byte);
+            res.push_back(int as f64);
+        }
+        res
     }
 }
 
@@ -79,3 +124,4 @@ fn parse_samples(bytes: &[u8]) -> Vec<f64> {
     }
     samples
 }
+
