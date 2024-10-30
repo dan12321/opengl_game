@@ -14,8 +14,10 @@ impl Map {
         let mut buf = String::new();
         file.read_to_string(&mut buf).unwrap();
         let mut lines = buf.lines();
+        let _ = lines.next().unwrap();
         let metadata = lines.next().unwrap();
-        let metadata_parts: Vec<f32> = metadata.split(",").map(|s| s.parse().unwrap()).collect();
+        let metadata_parts: Vec<f32> = metadata.split(",").filter_map(|s| s.parse().ok()).collect();
+        let _ = lines.next().unwrap();
         let beats: Vec<(bool, bool, bool)> = lines.map(|s| parse_map_line(s)).collect();
 
         Map {
