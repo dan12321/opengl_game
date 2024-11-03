@@ -19,7 +19,7 @@ use tracing::debug;
 
 use crate::config::{OUTLINE_FRAG_SHADER, OUTLINE_VERT_SHADER};
 use crate::shader::PointLight;
-use crate::state::GameState;
+use crate::state::SceneState;
 
 use super::config::{
     MODEL_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
@@ -125,7 +125,7 @@ impl Renderer {
         }, model_meshes)
     }
 
-    pub fn render(&self, state: &GameState) {
+    pub fn render(&self, state: &SceneState) {
         clear();
         unsafe {
             gl::Enable(gl::DEPTH_TEST);

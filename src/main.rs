@@ -2,7 +2,6 @@ mod audio;
 mod camera;
 mod config;
 mod controller;
-mod file_utils;
 mod physics;
 mod render;
 mod shader;
@@ -16,14 +15,12 @@ extern crate nalgebra as na;
 extern crate tracing;
 extern crate tracing_subscriber;
 
-use std::{sync::Arc, time::Instant};
+use std::time::Instant;
 
-use audio::{Audio, AudioEvent};
 use controller::{Button, Controller};
 use glfw::Context;
 use render::Renderer;
-use resource::manager::ResourceManager;
-use state::{GameState, Status};
+use state::Game;
 use tracing::{debug, Level};
 
 fn main() {
@@ -67,32 +64,13 @@ fn main() {
     // Program Setup
     let (renderer, model_objects) = Renderer::new(window_width, window_height);
     debug!("Renderer loaded");
-    let sad_level = "assets/maps/sad";
-    let mut state = GameState::new(&sad_level.into(), &model_objects);
-    let mut last_status = state.status;
+    let mut game = Game::new(renderer);
 
     debug!("Game state loaded");
     let mut controller = Controller::new(&mut glfw, events);
     debug!("Controller loaded");
-    let resources = Arc::new(ResourceManager::new());
-
-    let mut audio = Audio::new(resources.clone());
-    debug!("Audio loaded");
-
-    let death_track = "test.wav";
-    let base_audio_tracks = vec![death_track.to_string()];
-    audio.load_wavs(&base_audio_tracks);
-
-    let sad_song = "sad_melodica.wav";
-    let songs = vec![sad_song.to_string()];
-    audio.load_wavs(&songs);
-    let mut audio_events = Vec::new();
-    while !audio_events.contains(&AudioEvent::Loaded) {
-        audio_events = audio.update();
-    }
 
     let mut last_time = Instant::now();
-    audio.track_action(audio::Action::Play(sad_song.to_string()));
     while !window.should_close() {
         window.swap_buffers();
 
@@ -123,25 +101,6 @@ fn main() {
             }
         }
 
-        state.update(delta_time, &controller);
-        if state.status.clone() != last_status {
-            match state.status {
-                Status::Alive => {
-                    audio.track_action(audio::Action::Play(sad_song.into()));
-                },
-                Status::Dead => {
-                    audio.track_action(audio::Action::Slow(sad_song.into()));
-                    audio.track_action(audio::Action::Play(death_track.into()));
-                },
-                Status::Resetting => {
-                    audio.track_action(audio::Action::Reset(sad_song.into()));
-                },
-                Status::Paused(_) => {
-                    audio.track_action(audio::Action::Stop(sad_song.into()));
-                },
-            }
-        }
-        renderer.render(&state);
-        last_status = state.status;
+        game = game.update(delta_time, &controller, &model_objects);
     }
 }

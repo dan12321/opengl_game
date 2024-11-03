@@ -1,6 +1,7 @@
 use gl::types::*;
 use na::{vector, Matrix4, Rotation3, Translation3, Vector3};
 
+#[derive(Debug)]
 pub struct Camera {
     pub distance: GLfloat,
     pub default_distance: GLfloat,

@@ -16,8 +16,9 @@ use crate::resource::manager::ResourceManager;
 
 use super::resource::audio::Wav;
 
-pub struct Audio {
-    sender: Sender<Action>,
+#[derive(Debug)]
+pub struct AudioManager {
+    sender: Sender<AudioAction>,
     wavs: Arc<RwLock<HashMap<String, Wav>>>,
     resource_manager: Arc<ResourceManager>,
     resource_rec: Receiver<(String, Result<Wav>)>,
@@ -26,7 +27,7 @@ pub struct Audio {
     loaded_files: HashSet<String>,
 }
 
-impl Audio {
+impl AudioManager {
     pub fn new(resource_manager: Arc<ResourceManager>) -> Self {
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
@@ -44,7 +45,7 @@ impl Audio {
             config = format!("{:?}", &config),
             "Output device"
         );
-        let (sender, receiver) = mpsc::channel::<Action>();
+        let (sender, receiver) = mpsc::channel::<AudioAction>();
         let wavs = Arc::new(RwLock::new(HashMap::new()));
         let audio_thread_wavs = wavs.clone();
 
@@ -62,7 +63,7 @@ impl Audio {
         let loading_files = std::collections::HashSet::new();
         let loaded_files = std::collections::HashSet::new();
 
-        Audio {
+        AudioManager {
             sender,
             wavs,
             resource_manager,
@@ -73,18 +74,15 @@ impl Audio {
         }
     }
 
-    pub fn load_wavs(&mut self, wavs: &[String]) {
+    pub fn load_wavs(&mut self, wavs: &[&str]) {
         debug!("Load Wavs");
         for wav in wavs {
-            self.resource_manager.load_wav(wav.clone(), self.resource_send.clone());
-            self.loading_files.insert(wav.clone());
+            self.resource_manager.load_wav(wav.to_string(), self.resource_send.clone());
+            self.loading_files.insert(wav.to_string());
         }
     }
 
-    // TODO: Bit flags would probably make more sense than a Vec, think there's
-    // a lib for this with nice syntax.
-    pub fn update(&mut self) -> Vec<AudioEvent> {
-        let mut events = Vec::new();
+    pub fn loaded_check(&mut self) -> bool {
         if !self.loading_files.is_empty() {
             let mut new_wavs = Vec::with_capacity(self.loading_files.len());
             while let Ok((file, res)) = self.resource_rec.try_recv() {
@@ -106,34 +104,33 @@ impl Audio {
                 if self.loading_files.is_empty() {
                     let keys: Vec<&String> = wavs_lock.keys().collect();
                     debug!(wavs = format!("{:?}", keys), "Loaded All Wavs");
-                    events.push(AudioEvent::Loaded);
                 }
             }
         }
-        events
+        self.loading_files.is_empty()
     }
 
-    pub fn track_action(&self, action: Action) {
-        self.sender.send(action).unwrap();
+    pub fn get_sender(&self) -> Sender<AudioAction> {
+        self.sender.clone()
     }
 }
 
-impl Drop for Audio {
+impl Drop for AudioManager {
     fn drop(&mut self) {
-        self.sender.send(Action::Cleanup).unwrap();
+        self.sender.send(AudioAction::Cleanup).unwrap();
     }
 }
 
 struct Mixer {
     device: Device,
     config: SupportedStreamConfig,
-    receiver: Receiver<Action>,
+    receiver: Receiver<AudioAction>,
     wavs: Arc<RwLock<HashMap<String, Wav>>>,
 }
 
 impl Mixer {
     fn new(
-        receiver: Receiver<Action>,
+        receiver: Receiver<AudioAction>,
         device: Device,
         config: SupportedStreamConfig,
         wavs: Arc<RwLock<HashMap<String, Wav>>>,
@@ -171,7 +168,7 @@ impl Mixer {
         let seconds_per_sample = 1.0 / sample_rate;
         let channels = config.channels as usize;
 
-        let (sender, receiver) = mpsc::channel::<Action>();
+        let (sender, receiver) = mpsc::channel::<AudioAction>();
         let wavs = self.wavs.clone();
         let mut tracks: HashMap<String, Track> = HashMap::new();
         let mut next_value =
@@ -194,7 +191,7 @@ impl Mixer {
         stream.play().unwrap();
 
         let mut last_message = self.receiver.recv().unwrap();
-        while last_message != Action::Cleanup {
+        while last_message != AudioAction::Cleanup {
             debug!(
                 last_message = format!("{:?}", last_message),
                 "last audio message"
@@ -206,7 +203,7 @@ impl Mixer {
 
     fn get_next_audio_value(
         wavs: &Arc<RwLock<HashMap<String, Wav>>>,
-        receiver: &Receiver<Action>,
+        receiver: &Receiver<AudioAction>,
         tracks: &mut HashMap<String, Track>,
         seconds_per_sample: &f64,
     ) -> f32 {
@@ -218,7 +215,7 @@ impl Mixer {
             if track.state == TrackState::Playing || track.state == TrackState::Slow {
                 let w = wavs.read().unwrap();
                 let Some(wav) = w.get(track_name) else {
-                    error!(track=track_name, "Failed to get track audio");
+                    // error!(track=track_name, "Failed to get track audio");
                     continue;
                 };
                 let samples = &wav.samples;
@@ -263,12 +260,7 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-pub enum AudioEvent {
-    Loaded,
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Action {
+pub enum AudioAction {
     Play(String),
     Stop(String),
     Reset(String),
@@ -288,9 +280,9 @@ enum TrackState {
     Slow,
 }
 
-fn update_track_state(tracks: &mut HashMap<String, Track>, action: Action) {
+fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) {
     match action {
-        Action::Reset(track) => {
+        AudioAction::Reset(track) => {
             tracks.insert(
                 track,
                 Track {
@@ -299,7 +291,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: Action) {
                 },
             );
         }
-        Action::Play(track) => match tracks.get_mut(track.as_str()) {
+        AudioAction::Play(track) => match tracks.get_mut(track.as_str()) {
             Some(t) => t.state = TrackState::Playing,
             None => {
                 tracks.insert(
@@ -311,7 +303,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: Action) {
                 );
             }
         },
-        Action::Slow(track) => match tracks.get_mut(track.as_str()) {
+        AudioAction::Slow(track) => match tracks.get_mut(track.as_str()) {
             Some(t) => t.state = TrackState::Slow,
             None => {
                 tracks.insert(
@@ -323,7 +315,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: Action) {
                 );
             }
         },
-        Action::Stop(track) => match tracks.get_mut(track.as_str()) {
+        AudioAction::Stop(track) => match tracks.get_mut(track.as_str()) {
             Some(t) => t.state = TrackState::Stopped,
             None => {
                 tracks.insert(
@@ -335,6 +327,6 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: Action) {
                 );
             }
         },
-        Action::Cleanup => (),
+        AudioAction::Cleanup => (),
     }
 }

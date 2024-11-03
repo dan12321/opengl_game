@@ -99,14 +99,14 @@ fn parse_samples(bytes: &[u8]) -> Vec<f64> {
 #[derive(Debug)]
 enum ParseWavError {
     HeaderTooSmall(usize),
-    DataSizeInconsistent(usize, usize),
+    // DataSizeInconsistent(usize, usize),
 }
 
 impl Display for ParseWavError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::HeaderTooSmall(bytes) => write!(f, "Expected {} bytes in header but only found {}", WAV_HEADER_SIZE, bytes),
-            Self::DataSizeInconsistent(bytes, expected) => write!(f, "Expected {} bytes in data but found {}", expected, bytes),
+            // Self::DataSizeInconsistent(bytes, expected) => write!(f, "Expected {} bytes in data but found {}", expected, bytes),
         }
     }
 }

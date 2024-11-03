@@ -1,21 +1,113 @@
-mod map;
-
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::time::Duration;
 
-use map::Map;
+use anyhow::Result;
 use na::{vector, Matrix4};
+use tracing::debug;
 
+use crate::audio::{AudioAction, AudioManager};
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
-use crate::render::ModelMeshes;
-use crate::{file_utils, shader};
+use crate::render::{ModelMeshes, Renderer};
+use crate::resource::{
+    manager::ResourceManager,
+    map::Map,
+};
+use crate::shader;
 use crate::physics::AABBColider;
 use crate::shader::DirLight;
 
-pub struct GameState {
+
+pub struct Game {
+    audio_manager: AudioManager,
+    renderer: Renderer,
+    // resource_manager: Arc<ResourceManager>,
+    map_loading: Option<Map>,
+    // map_sender: Sender<(String, Result<Map>)>,
+    map_receiver: Receiver<(String, Result<Map>)>,
+    status: Status,
+}
+
+impl Game {
+    pub fn new(renderer: Renderer) -> Self {
+        // Setup managers
+        let resource_manager = Arc::new(ResourceManager::new());
+        let audio_manager = AudioManager::new(resource_manager.clone());
+
+        let (map_sender, map_receiver) = mpsc::channel();
+        let status = Status::Loading;
+
+        // Start loading initial level
+        resource_manager.load_map(SAD_MAP.to_string(), map_sender.clone());
+        Self {
+            audio_manager,
+            // resource_manager,
+            // map_sender,
+            map_receiver,
+            status,
+            map_loading: None,
+            renderer,
+        }
+    }
+
+    pub fn update(
+        mut self,
+        delta_time: Duration,
+        controller: &Controller,
+        model_objects: &HashMap<String, ModelMeshes>,
+    ) -> Self {
+        self.status = match self.status {
+            Status::Loading => self.loading_update(model_objects),
+            Status::Play(scene) => {
+                match scene.player_state {
+                    PlayerStatus::Alive => scene.alive_update(delta_time, controller),
+                    PlayerStatus::Dead => scene.dead_update(delta_time, controller),
+                }
+            },
+            Status::Paused(scene) => scene.pause_update(controller),
+            Status::Resetting(scene) => scene.resetting_update(),
+        };
+        if let Some(state) = self.status.get_state() {
+            self.renderer.render(state);
+        }
+        self
+    }
+
+    fn loading_update(&mut self, model_objects: &HashMap<String, ModelMeshes>) -> Status {
+        if self.map_loading.is_none() {
+            let Ok((_, map)) = self.map_receiver.try_recv() else {
+                return Status::Loading;
+            };
+            let map = map.unwrap();
+            // TODO: Move death_track to BaseLoading stage
+            let wavs = [DEATH_TRACK, map.music.as_str()];
+            self.audio_manager.load_wavs(&wavs);
+            self.map_loading = Some(map);
+            debug!("Map Loaded");
+        }
+
+        if !self.audio_manager.loaded_check() {
+            return Status::Loading;
+        } else {
+            debug!("Audio loaded");
+        }
+
+        let audio_sender = self.audio_manager.get_sender();
+
+        let scene = SceneState::new(
+            self.map_loading.take().unwrap(),
+            audio_sender,
+            model_objects,
+        );
+        scene.play()
+    }
+}
+
+#[derive(Debug)]
+pub struct SceneState {
     pub cubes: Vec<Model>,
     pub point_lights: Vec<PointLight>,
     pub dir_lights: Vec<DirLight>,
@@ -24,16 +116,19 @@ pub struct GameState {
     pub plane: Plane,
     pub camera: Camera,
     map: Map,
-    pub status: Status,
     cube_model: Vec<usize>,
+    player_state: PlayerStatus,
+    audio_sender: Sender<AudioAction>,
 }
 
-impl GameState {
-    pub fn new(level: &PathBuf, model_objects: &HashMap<String, ModelMeshes>) -> Self {
+impl SceneState {
+    pub fn new(
+        map: Map,
+        audio_sender: Sender<AudioAction>,
+        model_objects: &HashMap<String, ModelMeshes>
+    ) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
 
-        let full_path = file_utils::get_level_file(level, ".txt");
-        let map = Map::from_file(&full_path);
         let cube_model = model_objects.get("cube").unwrap();
         let plane_model = model_objects.get("plane").unwrap();
         let backpack_model = model_objects.get("backpack").unwrap();
@@ -41,7 +136,7 @@ impl GameState {
         let cubes = Self::starting_cubes(&map, &(cube_model.start..cube_model.end).collect());
         let lights = Self::starting_lights();
 
-        GameState {
+        SceneState {
             camera,
             cubes,
             point_lights: lights,
@@ -95,21 +190,13 @@ impl GameState {
                 ]
             },
             map,
-            status: Status::Alive,
             cube_model: (cube_model.start..cube_model.end).collect(),
+            player_state: PlayerStatus::Alive,
+            audio_sender,
         }
     }
 
-    pub fn update(&mut self, delta_time: Duration, controller: &Controller) {
-        self.status = match self.status.to_owned() {
-            Status::Alive => self.alive_update(delta_time, controller),
-            Status::Dead => self.dead_update(delta_time, controller),
-            Status::Paused(ls) => self.pause_update(controller, ls),
-            Status::Resetting => self.resetting_update(),
-        }
-    }
-
-    fn alive_update(&mut self, delta_time: Duration, controller: &Controller) -> Status {
+    fn alive_update(mut self, delta_time: Duration, controller: &Controller) -> Status {
         // timing properties
         let dt = delta_time.as_secs_f32();
         let displacement = config::MOVE_SPEED * dt;
@@ -174,18 +261,19 @@ impl GameState {
                 scale: cube.transform.scale,
             };
             if player_collider.aabb_colided(&collider) {
-                return Status::Dead;
+                self.player_state = PlayerStatus::Dead;
+                return self.death();
             }
         }
 
         if controller.buttons().contains(&Button::Pause) {
-            return Status::Paused(Status::Alive.into());
+            return self.pause();
         }
 
-        Status::Alive
+        Status::Play(self)
     }
 
-    fn dead_update(&mut self, delta_time: Duration, controller: &Controller) -> Status {
+    fn dead_update(mut self, delta_time: Duration, controller: &Controller) -> Status {
         // timing properties
         let dt = delta_time.as_secs_f32();
         let speed_ratio = 0.5;
@@ -213,15 +301,15 @@ impl GameState {
         // controller input
         let reset = controller.buttons().contains(&Button::Restart);
         if reset {
-            return Status::Resetting;
+            return self.reset();
         }
         if controller.buttons().contains(&Button::Pause) {
-            return Status::Paused(Status::Dead.into());
+            return self.pause();
         }
-        Status::Dead
+        Status::Play(self)
     }
 
-    fn pause_update(&mut self, controller: &Controller, last_status: usize) -> Status {
+    fn pause_update(mut self, controller: &Controller) -> Status {
         // controller input
         let (camera_lat, camera_long) = controller.angle();
         self.camera.latitude = camera_long;
@@ -231,21 +319,23 @@ impl GameState {
         let unpause = controller.buttons().contains(&Button::Pause);
 
         if reset {
-            return Status::Resetting;
-        } else if unpause {
-            return last_status.into();
+            return self.reset();
         }
-        Status::Paused(last_status)
+        if unpause {
+            return self.play();
+        }
+        Status::Paused(self)
     }
 
-    fn resetting_update(&mut self) -> Status {
+    fn resetting_update(mut self) -> Status {
         self.point_lights = Self::starting_lights();
         self.cubes = Self::starting_cubes(&self.map, &self.cube_model);
         self.player.model.transform.position.x = 0.0;
         self.player.model.transform.position.z = 0.0;
         self.player.target_lane = 1;
         self.player.current_lane = 1;
-        Status::Alive
+        self.player_state = PlayerStatus::Alive;
+        self.play()
     }
 
     fn starting_lights() -> Vec<PointLight> {
@@ -336,6 +426,36 @@ impl GameState {
         }
         cubes
     }
+
+    fn play(self) -> Status {
+        let action = match self.player_state {
+            PlayerStatus::Alive => AudioAction::Play(self.map.music.clone()),
+            PlayerStatus::Dead => {
+                AudioAction::Slow(self.map.music.clone())
+            },
+        };
+        self.audio_sender.send(action).unwrap();
+        Status::Play(self)
+    }
+
+    fn death(self) -> Status {
+        self.audio_sender.send(AudioAction::Play(DEATH_TRACK.to_string())).unwrap();
+        let action = AudioAction::Slow(self.map.music.clone());
+        self.audio_sender.send(action).unwrap();
+        Status::Play(self)
+    }
+
+    fn pause(self) -> Status {
+        let action = AudioAction::Stop(self.map.music.clone());
+        self.audio_sender.send(action).unwrap();
+        Status::Paused(self)
+    }
+
+    fn reset(self) -> Status {
+        let action = AudioAction::Reset(self.map.music.clone());
+        self.audio_sender.send(action).unwrap();
+        Status::Resetting(self)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -364,6 +484,7 @@ impl PointLight {
     }
 }
 
+#[derive(Debug)]
 pub struct Plane {
     pub models: [Model; 3],
 }
@@ -419,34 +540,30 @@ impl Transform {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum Status {
-    Alive,
-    Dead,
-    Resetting,
+    Play(SceneState),
+    Resetting(SceneState),
     // Using a usize to represent last status since other status' don't contain
     // data and it make ownership easier
-    Paused(usize),
+    Paused(SceneState),
+    Loading,
 }
 
-impl From<usize> for Status {
-    fn from(value: usize) -> Self {
-        match value {
-            0 => Status::Alive,
-            1 => Status::Dead,
-            2 => Status::Resetting,
-            _ => panic!("unexpected status value"),
-        }
-    }
-}
-
-impl Into<usize> for Status {
-    fn into(self) -> usize {
+impl Status {
+    fn get_state(&self) -> Option<&SceneState> {
         match self {
-            Self::Alive => 0,
-            Self::Dead => 1,
-            Self::Resetting => 2,
-            Self::Paused(_) => panic!("can't represent paused as usize"),
+            Self::Play(s) | Self::Resetting(s) | Self::Paused(s) => Some(s),
+            Self::Loading => None,
         }
     }
 }
+
+#[derive(Debug)]
+pub enum PlayerStatus {
+    Alive,
+    Dead
+}
+
+const DEATH_TRACK: &'static str = "test.wav";
+const SAD_MAP: &'static str = "sad_melodica.txt";
