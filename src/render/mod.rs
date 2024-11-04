@@ -37,7 +37,7 @@ impl Renderer {
     pub fn new(window_width: u32, window_height: u32) -> (Self, HashMap<String, ModelMeshes>) {
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
-            gl::Enable(gl::STENCIL_TEST);
+            // gl::Enable(gl::STENCIL_TEST);
         }
         let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
         let fovy: GLfloat = PI / 2.0;
@@ -127,11 +127,11 @@ impl Renderer {
 
     pub fn render(&self, state: &SceneState) {
         clear();
-        unsafe {
-            gl::Enable(gl::DEPTH_TEST);
-            gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
-            gl::StencilMask(0x00);
-        }
+        // unsafe {
+        //     gl::Enable(gl::DEPTH_TEST);
+        //     gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
+        //     gl::StencilMask(0x00);
+        // }
         let view = state.camera.transform();
         let light_uniforms: Vec<PointLight> =
             state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
@@ -140,7 +140,7 @@ impl Renderer {
 
         // Non stenciled models
         self.model.draw(
-            &[&[state.player.model.clone()], state.plane.models.as_slice()].concat(),
+            &[&state.cubes[..], &[state.player.model.clone()], state.plane.models.as_slice()].concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),
@@ -148,33 +148,33 @@ impl Renderer {
             self.projection.as_matrix().clone(),
         );
 
-        // Stenciled Models
-        unsafe {
-            gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
-            gl::StencilMask(0xFF);
-        }
-        self.model.draw(
-            state.cubes.as_slice(),
-            &light_uniforms,
-            &state.dir_lights,
-            &state.camera.position().into(),
-            view,
-            self.projection.as_matrix().clone(),
-        );
-        unsafe {
-            gl::StencilFunc(gl::NOTEQUAL, 1, 0xFF);
-            gl::StencilMask(0x00);
-            gl::Disable(gl::DEPTH_TEST);
-        }
-        self.outline.draw(
-            state.cubes.as_slice(),
-            view,
-            self.projection.as_matrix().clone());
-        unsafe {
-            gl::StencilMask(0xFF);
-            gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
-            gl::Enable(gl::DEPTH_TEST);
-        }
+        // // Stenciled Models
+        // unsafe {
+        //     gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
+        //     gl::StencilMask(0xFF);
+        // }
+        // self.model.draw(
+        //     state.cubes.as_slice(),
+        //     &light_uniforms,
+        //     &state.dir_lights,
+        //     &state.camera.position().into(),
+        //     view,
+        //     self.projection.as_matrix().clone(),
+        // );
+        // unsafe {
+        //     gl::StencilFunc(gl::NOTEQUAL, 1, 0xFF);
+        //     gl::StencilMask(0x00);
+        //     gl::Disable(gl::DEPTH_TEST);
+        // }
+        // self.outline.draw(
+        //     state.cubes.as_slice(),
+        //     view,
+        //     self.projection.as_matrix().clone());
+        // unsafe {
+        //     gl::StencilMask(0xFF);
+        //     gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
+        //     gl::Enable(gl::DEPTH_TEST);
+        // }
     }
 }
 
@@ -186,6 +186,7 @@ pub struct ModelMeshes {
 fn clear() {
     unsafe {
         gl::ClearColor(0.0, 0.0, 0.0, 1.0);
-        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+        gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+        // gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
     }
 }
