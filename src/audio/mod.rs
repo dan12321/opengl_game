@@ -221,13 +221,17 @@ impl Mixer {
                 let samples = &wav.samples;
                 let track_sample_rate = wav.sample_rate as f64;
                 let raw_index = track.time * track_sample_rate as f64;
-                let index = raw_index as usize;
-                if index >= samples.len() {
+                if raw_index >= samples.len() as f64 {
                     track.state = TrackState::Stopped;
                     track.time = 0.0;
                     continue;
                 }
-                let sample = samples[index];
+                let floor_index = raw_index.floor();
+                let ceil_index = raw_index.ceil();
+                let floor_sample = samples[floor_index as usize];
+                let ceil_sample = samples[ceil_index as usize];
+                let lambda = raw_index - floor_index;
+                let sample = lambda * ceil_sample + ((1.0 - lambda) * floor_sample);
                 result += sample / 32_768.0;
 
                 let sample_step = if track.state == TrackState::Slow {
