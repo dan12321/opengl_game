@@ -19,8 +19,7 @@ pub enum Button {
     Restart,
     Quit,
     Pause,
-    Level1,
-    Level2,
+    Level(usize),
 }
 
 impl<'a> Controller<'a> {
@@ -46,10 +45,10 @@ impl<'a> Controller<'a> {
                     buttons.push(Button::Quit);
                 },
                 WindowEvent::Key(Key::Num1, _, Action::Press, _) => {
-                    buttons.push(Button::Level1);
+                    buttons.push(Button::Level(0));
                 },
                 WindowEvent::Key(Key::Num2, _, Action::Press, _) => {
-                    buttons.push(Button::Level2);
+                    buttons.push(Button::Level(1));
                 },
                 WindowEvent::Key(Key::R, _, Action::Press, _) => {
                     buttons.push(Button::Restart);

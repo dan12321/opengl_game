@@ -79,21 +79,6 @@ fn main() {
         for button in controller.buttons() {
             match button {
                 Button::Quit => window.set_should_close(true),
-                // Button::Level1 => {
-                //     state = GameState::new(&sad_level.into(), &model_objects);
-                //     audio.track_action(audio::Action::Stop(sad_song.into()));
-                // },
-                // Button::Level2 => {
-                //     state = GameState::new(&sad_level.into(), &model_objects);
-                //     audio.track_action(audio::Action::Play(sad_song.into()));
-                //     // let track = upbeat_track;
-                //     // last_time = Instant::now();
-                //     // current_time = Instant::now();
-                //     // delta_time = current_time.duration_since(last_time);
-                //     // last_time = current_time;
-                //     // current_track = track;
-                //     // audio.track_action(audio::Action::Play(track));
-                // },
                 _ => (),
             }
         }

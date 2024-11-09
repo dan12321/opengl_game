@@ -23,10 +23,12 @@ use crate::shader::DirLight;
 pub struct Game {
     audio_manager: AudioManager,
     renderer: Renderer,
-    // resource_manager: Arc<ResourceManager>,
+    resource_manager: Arc<ResourceManager>,
     map_loading: Option<Map>,
-    // map_sender: Sender<(String, Result<Map>)>,
+    scene_resources: Option<SceneResources>,
+    map_sender: Sender<(String, Result<Map>)>,
     map_receiver: Receiver<(String, Result<Map>)>,
+    maps: Vec<String>,
     status: Status,
 }
 
@@ -49,12 +51,17 @@ impl Game {
         ]);
         Self {
             audio_manager,
-            // resource_manager,
-            // map_sender,
+            resource_manager,
+            map_sender,
             map_receiver,
             status,
             map_loading: None,
             renderer,
+            scene_resources: None,
+            maps: vec![
+                SAD_MAP.to_string(),
+                UPBEAT_MAP.to_string(),
+            ],
         }
     }
 
@@ -64,6 +71,7 @@ impl Game {
         controller: &Controller,
     ) -> Self {
         self.status = match self.status {
+            Status::Load(map) => self.load_map(map),
             Status::Loading => self.loading_update(),
             Status::Play(scene) => {
                 match scene.player_state {
@@ -76,6 +84,11 @@ impl Game {
         };
         self.renderer.update(self.status.get_state());
         self
+    }
+
+    fn load_map(&self, map: usize) -> Status {
+        self.resource_manager.load_map(self.maps[map].clone(), self.map_sender.clone());
+        Status::Loading
     }
 
     fn loading_update(&mut self) -> Status {
@@ -261,6 +274,9 @@ impl SceneState {
         if controller.buttons().contains(&Button::Pause) {
             return self.pause();
         }
+        if let Some(map) = self.map_input(controller) {
+            return self.load(map);
+        }
 
         Status::Play(self)
     }
@@ -292,6 +308,9 @@ impl SceneState {
 
         // controller input
         let reset = controller.buttons().contains(&Button::Restart);
+        if let Some(map) = self.map_input(controller) {
+            return self.load(map);
+        }
         if reset {
             return self.reset();
         }
@@ -309,6 +328,10 @@ impl SceneState {
         self.camera.distance = controller.zoom();
         let reset = controller.buttons().contains(&Button::Restart);
         let unpause = controller.buttons().contains(&Button::Pause);
+
+        if let Some(map) = self.map_input(controller) {
+            return self.load(map);
+        }
 
         if reset {
             return self.reset();
@@ -448,6 +471,22 @@ impl SceneState {
         self.audio_sender.send(action).unwrap();
         Status::Resetting(self)
     }
+
+    fn load(self, map: usize) -> Status {
+        let action = AudioAction::Reset(self.map.music.clone());
+        self.audio_sender.send(action).unwrap();
+        Status::Load(map)
+    }
+
+    fn map_input(&self, controller: &Controller) -> Option<usize> {
+        for button in controller.buttons() {
+            match button {
+                Button::Level(i) => return Some(*i),
+                _ => (),
+            }
+        }
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -536,9 +575,10 @@ impl Transform {
 pub enum Status {
     Play(SceneState),
     Resetting(SceneState),
-    // Using a usize to represent last status since other status' don't contain
-    // data and it make ownership easier
     Paused(SceneState),
+    // Storing map as a usize is a bit of a hack to keep ownership happy. This
+    // is a sign that how updates is handled needs refactoring.
+    Load(usize),
     Loading,
 }
 
@@ -547,6 +587,7 @@ impl Status {
         match self {
             Self::Play(s) | Self::Resetting(s) | Self::Paused(s) => Some(s),
             Self::Loading => None,
+            Self::Load(_) => None,
         }
     }
 }
@@ -557,8 +598,13 @@ pub enum PlayerStatus {
     Dead
 }
 
+struct SceneResources {
+    music: Option<String>,
+}
+
 const DEATH_TRACK: &'static str = "test.wav";
 const SAD_MAP: &'static str = "sad_melodica.txt";
+const UPBEAT_MAP: &'static str = "upbeat.txt";
 const CUBE_MODEL: &'static str = "cube/cube.obj";
 const PLANE_MODEL: &'static str = "plane/plane.obj";
 const BACKPACK_MODEL: &'static str = "backpack/backpack.obj";

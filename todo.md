@@ -17,6 +17,7 @@
       (May be wanted later anyway but the current loading time for just a 1min wav is still poor)
     - Option 3 profile where time is being spent to try and identify performance mistakes
   - [X] Fix speed higher than expected (samples per second should respect config) (kinda like the pitch shift solo)
+  - [ ] Changing audio source causes a crash
   - [X] Pitch changes through the song in a repeatable way
     - Increased precision of time variables to f64. Still slight drift between
       wav time and measured time but the rate of rate no longer changes (solving pitch).

@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{Result, Context};
+use tracing::debug;
 
 use super::manager::Loadable;
 
@@ -23,6 +24,7 @@ pub struct Map {
 impl Loadable for Map {
     type Output = Self;
     fn load(file: &str) -> Result<Self> {
+        debug!(file = file, "Loading Map");
         let mut file = OpenOptions::new().read(true).open(file)?;
 
         let mut buf = String::new();
