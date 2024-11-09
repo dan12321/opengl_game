@@ -19,7 +19,6 @@ use std::time::Instant;
 
 use controller::{Button, Controller};
 use glfw::Context;
-use render::Renderer;
 use state::Game;
 use tracing::{debug, Level};
 
@@ -62,9 +61,7 @@ fn main() {
     gl::load_with(|s| window.get_proc_address(s));
 
     // Program Setup
-    let (renderer, model_objects) = Renderer::new(window_width, window_height);
-    debug!("Renderer loaded");
-    let mut game = Game::new(renderer);
+    let mut game = Game::new(window_width, window_height);
 
     debug!("Game state loaded");
     let mut controller = Controller::new(&mut glfw, events);
@@ -101,6 +98,6 @@ fn main() {
             }
         }
 
-        game = game.update(delta_time, &controller, &model_objects);
+        game = game.update(delta_time, &controller);
     }
 }

@@ -1,24 +1,23 @@
 use std::sync::mpsc::Receiver;
-use std::path::PathBuf;
 use std::thread;
 use std::sync::mpsc::{self, Sender};
 
 use anyhow::Result;
-use tracing::debug;
 
 use super::audio::Wav;
 use super::map::Map;
+use super::model::{Material, Model, Texture};
 
 #[derive(Debug)]
 pub struct ResourceManager {
-    req_sender: Sender<DataRequest>,
+    req_sender: Sender<DataReq>,
     // shutdown_sender: Sender<()>,
     // io_thread: JoinHandle<()>,
 }
 
 impl ResourceManager {
     pub fn new() -> Self {
-        let (req_sender, req_receiver) = mpsc::channel::<DataRequest>();
+        let (req_sender, req_receiver) = mpsc::channel::<DataReq>();
         let (_shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
         let _io_thread = thread::spawn(move || {
             run_io(req_receiver, shutdown_receiver);
@@ -33,16 +32,28 @@ impl ResourceManager {
 
     // Note: might be a spot for generics, just trait "from_file". Maybe proc_macro
     // if that doesn't work due to needing an enum type for the channel.
-    pub fn load_wav(&self, file: String, callback_sender: Sender<(String, Result<Wav>)>) {
-        self.req_sender.send(DataRequest::Wav(file, callback_sender)).unwrap();
+    pub fn load_wav(&self, file: String, callback_sender: DataResSender<Wav>) {
+        self.req_sender.send(DataReq::Wav((file, callback_sender))).unwrap();
     }
 
-    pub fn load_map(&self, file: String, callback_sender: Sender<(String, Result<Map>)>) {
-        self.req_sender.send(DataRequest::Map(file, callback_sender)).unwrap();
+    pub fn load_map(&self, file: String, callback_sender: DataResSender<Map>) {
+        self.req_sender.send(DataReq::Map((file, callback_sender))).unwrap();
+    }
+
+    pub fn load_model(&self, file: String, callback_sender: DataResSender<Model>) {
+        self.req_sender.send(DataReq::Model((file, callback_sender))).unwrap();
+    }
+
+    pub fn load_material(&self, file: String, callback_sender: DataResSender<Vec<Material>>) {
+        self.req_sender.send(DataReq::Material((file, callback_sender))).unwrap();
+    }
+
+    pub fn load_texture(&self, file: String, callback_sender: DataResSender<Texture>) {
+        self.req_sender.send(DataReq::Texture((file, callback_sender))).unwrap();
     }
 }
 
-fn run_io(rec: Receiver<DataRequest>, shutdown: Receiver<()>) {
+fn run_io(rec: Receiver<DataReq>, shutdown: Receiver<()>) {
     loop {
         if shutdown.try_recv().is_ok() {
             break;
@@ -52,28 +63,50 @@ fn run_io(rec: Receiver<DataRequest>, shutdown: Receiver<()>) {
         };
 
         match req {
-            DataRequest::Wav(s, send) => {
-                let dir = PathBuf::from(AUDIO_LOCATION);
-                let path = dir.join(&s);
-                debug!(path = format!("{:?}", &path), "Loading Wav");
-                let wav = Wav::new(&path);
-                debug!(path = format!("{:?}", &path), "Loaded Wav");
-                send.send((s, wav)).unwrap();
+            DataReq::Wav((s, send)) => {
+                load::<Wav>(AUDIO_LOCATION, s, send);
             },
-            DataRequest::Map(s, send) => {
-                let dir = PathBuf::from(MAP_LOCATION);
-                let path = dir.join(&s);
-                let map = Map::from_file(&path);
-                send.send((s, map)).unwrap();
-            }
+            DataReq::Map((s, send)) => {
+                load::<Map>(MAP_LOCATION, s, send);
+            },
+            DataReq::Model((s, send)) => {
+                load::<Model>(MODEL_LOCATION, s, send);
+            },
+            DataReq::Material((s, send)) => {
+                load::<Material>("", s, send);
+            },
+            DataReq::Texture((s, send)) => {
+                load::<Texture>("", s, send);
+            },
         };
     }
 }
 
-enum DataRequest {
-    Wav(String, Sender<(String, Result<Wav>)>),
-    Map(String, Sender<(String, Result<Map>)>),
+enum DataReq {
+    Wav(DataReqBody<Wav>),
+    Map(DataReqBody<Map>),
+    Model(DataReqBody<Model>),
+    Material(DataReqBody<Vec<Material>>),
+    Texture(DataReqBody<Texture>),
 }
 
-const AUDIO_LOCATION: &'static str = "assets/sounds";
-const MAP_LOCATION: &'static str = "assets/maps";
+pub type DataReqBody<T> = (String, DataResSender<T>);
+
+pub type DataResSender<T> = Sender<(String, Result<T>)>;
+
+pub type DataResRec<T> = Receiver<(String, Result<T>)>;
+
+pub trait Loadable {
+    type Output;
+    fn load(path: &str) -> Result<Self::Output>;
+}
+
+fn load<T: Loadable>(resource_location: &str, resource_name: String, sender: DataResSender<T::Output>) {
+    let path: String = resource_location.to_string() + &resource_name;
+    let resource: Result<T::Output> = T::load(&path);
+    sender.send((resource_name, resource)).unwrap();
+}
+
+const AUDIO_LOCATION: &'static str = "assets/sounds/";
+const MAP_LOCATION: &'static str = "assets/maps/";
+const MODEL_LOCATION: &'static str = "assets/models/";

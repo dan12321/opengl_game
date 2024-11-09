@@ -4,10 +4,11 @@ use std::{
     fs::OpenOptions,
     io::Read,
     num::ParseFloatError,
-    path::PathBuf,
 };
 
 use anyhow::{Result, Context};
+
+use super::manager::Loadable;
 
 #[derive(Debug)]
 pub struct Map {
@@ -19,9 +20,10 @@ pub struct Map {
     pub beats: Vec<(bool, bool, bool)>,
 }
 
-impl Map {
-    pub fn from_file(filepath: &PathBuf) -> Result<Self> {
-        let mut file = OpenOptions::new().read(true).open(filepath)?;
+impl Loadable for Map {
+    type Output = Self;
+    fn load(file: &str) -> Result<Self> {
+        let mut file = OpenOptions::new().read(true).open(file)?;
 
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;

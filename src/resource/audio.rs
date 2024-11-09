@@ -3,11 +3,12 @@ use std::{
     fmt::Display,
     fs::OpenOptions,
     io::Read,
-    path::PathBuf,
 };
 
 use anyhow::Result;
 use tracing::debug;
+
+use super::manager::Loadable;
 
 const WAV_HEADER_SIZE: usize = 44;
 
@@ -19,8 +20,9 @@ pub struct Wav {
     pub sample_size: u32,
 }
 
-impl Wav {
-    pub fn new(path: &PathBuf) -> Result<Self>{
+impl Loadable for Wav {
+    type Output = Self;
+    fn load(path: &str) -> Result<Self>{
         let mut file = OpenOptions::new().read(true).open(&path)?;
 
         let mut file_header: [u8; WAV_HEADER_SIZE] = [0; WAV_HEADER_SIZE];

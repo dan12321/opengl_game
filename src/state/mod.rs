@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,7 +10,7 @@ use crate::audio::{AudioAction, AudioManager};
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
-use crate::render::{ModelMeshes, Renderer};
+use crate::render::Renderer;
 use crate::resource::{
     manager::ResourceManager,
     map::Map,
@@ -32,16 +31,22 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(renderer: Renderer) -> Self {
+    pub fn new(window_width: u32, window_height: u32) -> Self {
         // Setup managers
         let resource_manager = Arc::new(ResourceManager::new());
         let audio_manager = AudioManager::new(resource_manager.clone());
+        let mut renderer = Renderer::new(window_width, window_height, resource_manager.clone());
 
         let (map_sender, map_receiver) = mpsc::channel();
         let status = Status::Loading;
 
         // Start loading initial level
         resource_manager.load_map(SAD_MAP.to_string(), map_sender.clone());
+        renderer.load_models(vec![
+            CUBE_MODEL.to_string(),
+            PLANE_MODEL.to_string(),
+            BACKPACK_MODEL.to_string(),
+        ]);
         Self {
             audio_manager,
             // resource_manager,
@@ -57,10 +62,9 @@ impl Game {
         mut self,
         delta_time: Duration,
         controller: &Controller,
-        model_objects: &HashMap<String, ModelMeshes>,
     ) -> Self {
         self.status = match self.status {
-            Status::Loading => self.loading_update(model_objects),
+            Status::Loading => self.loading_update(),
             Status::Play(scene) => {
                 match scene.player_state {
                     PlayerStatus::Alive => scene.alive_update(delta_time, controller),
@@ -70,13 +74,11 @@ impl Game {
             Status::Paused(scene) => scene.pause_update(controller),
             Status::Resetting(scene) => scene.resetting_update(),
         };
-        if let Some(state) = self.status.get_state() {
-            self.renderer.render(state);
-        }
+        self.renderer.update(self.status.get_state());
         self
     }
 
-    fn loading_update(&mut self, model_objects: &HashMap<String, ModelMeshes>) -> Status {
+    fn loading_update(&mut self) -> Status {
         if self.map_loading.is_none() {
             let Ok((_, map)) = self.map_receiver.try_recv() else {
                 return Status::Loading;
@@ -89,10 +91,8 @@ impl Game {
             debug!("Map Loaded");
         }
 
-        if !self.audio_manager.loaded_check() {
+        if !self.audio_manager.loaded_check() || !self.renderer.loaded_check() {
             return Status::Loading;
-        } else {
-            debug!("Audio loaded");
         }
 
         let audio_sender = self.audio_manager.get_sender();
@@ -100,7 +100,6 @@ impl Game {
         let scene = SceneState::new(
             self.map_loading.take().unwrap(),
             audio_sender,
-            model_objects,
         );
         scene.play()
     }
@@ -108,7 +107,7 @@ impl Game {
 
 #[derive(Debug)]
 pub struct SceneState {
-    pub cubes: Vec<Model>,
+    pub cubes: Vec<GameObject>,
     pub point_lights: Vec<PointLight>,
     pub dir_lights: Vec<DirLight>,
     pub player: Player,
@@ -116,7 +115,6 @@ pub struct SceneState {
     pub plane: Plane,
     pub camera: Camera,
     map: Map,
-    cube_model: Vec<usize>,
     player_state: PlayerStatus,
     audio_sender: Sender<AudioAction>,
 }
@@ -125,15 +123,10 @@ impl SceneState {
     pub fn new(
         map: Map,
         audio_sender: Sender<AudioAction>,
-        model_objects: &HashMap<String, ModelMeshes>
     ) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
 
-        let cube_model = model_objects.get("cube").unwrap();
-        let plane_model = model_objects.get("plane").unwrap();
-        let backpack_model = model_objects.get("backpack").unwrap();
-
-        let cubes = Self::starting_cubes(&map, &(cube_model.start..cube_model.end).collect());
+        let cubes = Self::starting_cubes(&map);
         let lights = Self::starting_lights();
 
         SceneState {
@@ -151,46 +144,45 @@ impl SceneState {
                 target_lane: 1,
                 current_lane: 1,
                 lerp: 1.0,
-                model: Model {
+                model: GameObject {
                     transform: Transform {
                         position: (0.0, 0.75, 0.0).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
-                    meshes: (backpack_model.start..backpack_model.end).collect(),
+                    model: BACKPACK_MODEL.to_string(),
                 },
             },
             speed: BEAT_SIZE * (map.bpm / 60.0) * map.subdivisions,
             plane: Plane {
                 models: [
-                    Model {
+                    GameObject {
                         transform: Transform {
                             position: (0.0, -0.5, 0.0).into(),
                             scale: (1.0, 1.0, 1.0).into(),
                             rotation: Matrix4::identity(),
                         },
-                        meshes: (plane_model.start..plane_model.end).collect(),
+                        model: PLANE_MODEL.to_string(),
                     },
-                    Model {
+                    GameObject {
                         transform: Transform {
                             position: (0.0, -0.5, -PLANE_LENGTH).into(),
                             scale: (1.0, 1.0, 1.0).into(),
                             rotation: Matrix4::identity(),
                         },
-                        meshes: (plane_model.start..plane_model.end).collect(),
+                        model: PLANE_MODEL.to_string(),
                     },
-                    Model {
+                    GameObject {
                         transform: Transform {
                             position: (0.0, -0.5, -PLANE_LENGTH * 2.0).into(),
                             scale: (1.0, 1.0, 1.0).into(),
                             rotation: Matrix4::identity(),
                         },
-                        meshes: (plane_model.start..plane_model.end).collect(),
+                        model: PLANE_MODEL.to_string(),
                     }
                 ]
             },
             map,
-            cube_model: (cube_model.start..cube_model.end).collect(),
             player_state: PlayerStatus::Alive,
             audio_sender,
         }
@@ -329,7 +321,7 @@ impl SceneState {
 
     fn resetting_update(mut self) -> Status {
         self.point_lights = Self::starting_lights();
-        self.cubes = Self::starting_cubes(&self.map, &self.cube_model);
+        self.cubes = Self::starting_cubes(&self.map);
         self.player.model.transform.position.x = 0.0;
         self.player.model.transform.position.z = 0.0;
         self.player.target_lane = 1;
@@ -385,42 +377,42 @@ impl SceneState {
         lights
     }
 
-    fn starting_cubes(map: &Map, cube_model: &Vec<usize>) -> Vec<Model> {
+    fn starting_cubes(map: &Map) -> Vec<GameObject> {
         let mut cubes = Vec::with_capacity(64);
         for i in 0..map.beats.len() {
             let (l, m, r) = map.beats[i];
             let padding = -(map.start_offset + i as f32) * BEAT_SIZE;
             if l {
-                cubes.push(Model {
+                cubes.push(GameObject {
                     transform: Transform {
                         position: (-COLUMN_WIDTH, 0.0, padding).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    meshes: cube_model.clone(),
+                    model: CUBE_MODEL.to_string(),
                 });
             }
             if m {
-                cubes.push(Model {
+                cubes.push(GameObject {
                     transform: Transform {
                         position: (0.0, 0.0, padding).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    meshes: cube_model.clone(),
+                    model: CUBE_MODEL.to_string(),
                 });
             }
             if r {
-                cubes.push(Model {
+                cubes.push(GameObject {
                     transform: Transform {
                         position: (COLUMN_WIDTH, 0.0, padding).into(),
                         scale: (0.75, 0.75, 0.75).into(),
                         rotation: Matrix4::identity(),
                     },
                     // material: BOX_MATERIAL,
-                    meshes: cube_model.clone(),
+                    model: CUBE_MODEL.to_string(),
                 });
             }
         }
@@ -459,9 +451,9 @@ impl SceneState {
 }
 
 #[derive(Clone, Debug)]
-pub struct Model {
+pub struct GameObject {
     pub transform: Transform,
-    pub meshes: Vec<usize>,
+    pub model: String,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -486,7 +478,7 @@ impl PointLight {
 
 #[derive(Debug)]
 pub struct Plane {
-    pub models: [Model; 3],
+    pub models: [GameObject; 3],
 }
 
 impl Plane {
@@ -505,7 +497,7 @@ pub struct Player {
     target_lane: usize,
     current_lane: usize,
     lerp: f32,
-    pub model: Model,
+    pub model: GameObject,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -567,3 +559,6 @@ pub enum PlayerStatus {
 
 const DEATH_TRACK: &'static str = "test.wav";
 const SAD_MAP: &'static str = "sad_melodica.txt";
+const CUBE_MODEL: &'static str = "cube/cube.obj";
+const PLANE_MODEL: &'static str = "plane/plane.obj";
+const BACKPACK_MODEL: &'static str = "backpack/backpack.obj";

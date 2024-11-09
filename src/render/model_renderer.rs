@@ -1,26 +1,22 @@
 use std::{
-    ffi::{c_void, CStr, CString},
-    mem,
-    path::PathBuf,
-    ptr,
+    collections::HashMap, ffi::{c_void, CStr, CString}, mem, path::PathBuf, ptr
 };
 
 use gl::types::*;
-use image::{ColorType, DynamicImage};
+use image::ColorType;
 use na::Matrix4;
+use tracing::error;
 
 use crate::{
-    shader::{create_shader, template_dir_light, template_point_light, DirLight, DirLightProp, OpenGLError, PointLight, PointLightProp},
-    state::{Model, XYZ},
+    resource::model::Texture, shader::{create_shader, template_dir_light, template_point_light, DirLight, DirLightProp, OpenGLError, PointLight, PointLightProp}, state::{GameObject, XYZ}
 };
 
-use super::model_loader::{Material, Mesh};
+use crate::resource::model::{Material, Mesh};
 
 pub struct ModelRenderer {
     shader_id: u32,
-    parsed_meshes: Vec<ParsedModel>,
-    materials: Vec<Material>,
-    textures: Vec<u32>,
+    parsed_meshes: HashMap<String, ParsedMesh>,
+    textures: HashMap<String, u32>,
     view_uniform: i32,
     projection_uniform: i32,
     camera_position_uniform: i32,
@@ -34,9 +30,6 @@ impl ModelRenderer {
     pub fn new(
         vert_shader: &PathBuf,
         frag_shader: &PathBuf,
-        meshes: Vec<Mesh>,
-        materials: Vec<Material>,
-        textures: &[DynamicImage],
     ) -> Result<Self, OpenGLError> {
         unsafe {
             // Create program
@@ -66,84 +59,6 @@ impl ModelRenderer {
             }
             gl::DeleteShader(vert);
             gl::DeleteShader(frag);
-
-            let mut parsed_models = Vec::with_capacity(meshes.len());
-            // Set up vertices and indices
-            for meshes in meshes {
-                let mut vao = 0;
-                let mut vbo = 0;
-                let mut ebo = 0;
-                gl::GenVertexArrays(1, &mut vao);
-                gl::GenBuffers(1, &mut vbo);
-                gl::GenBuffers(1, &mut ebo);
-                gl::BindVertexArray(vao);
-                gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-                gl::BufferData(
-                    gl::ARRAY_BUFFER,
-                    (meshes.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
-                    &meshes.vertices[0] as *const _ as *const c_void,
-                    gl::STATIC_DRAW,
-                );
-    
-                gl::BufferData(
-                    gl::ELEMENT_ARRAY_BUFFER,
-                    (meshes.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
-                    &meshes.indices[0] as *const _ as *const c_void,
-                    gl::STATIC_DRAW,
-                );
-
-                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
-                let stride = 8 * mem::size_of::<GLfloat>() as i32;
-                gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
-                gl::EnableVertexAttribArray(0);
-                let normal_start = 3 * mem::size_of::<GLfloat>() as i32;
-                gl::VertexAttribPointer(
-                    1,
-                    3,
-                    gl::FLOAT,
-                    gl::FALSE,
-                    stride,
-                    normal_start as *mut c_void,
-                );
-                gl::EnableVertexAttribArray(1);
-                let tex_start = normal_start + (3 * mem::size_of::<GLfloat>() as i32);
-                gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, stride, tex_start as *mut c_void);
-                gl::EnableVertexAttribArray(2);
-
-                parsed_models.push(ParsedModel {
-                    vao,
-                    indices: meshes.indices,
-                    material: meshes.material,
-                });
-            }
-
-            // texture
-            let mut texture_locations = Vec::with_capacity(textures.len());
-            for texture in textures {
-                let mut texture_location = 0;
-                let texture_bytes = texture.as_bytes();
-                let format = match texture.color() {
-                    ColorType::Rgb8 => gl::RGB,
-                    ColorType::Rgba8 => gl::RGBA,
-                    // TODO: Find what each color type should match to
-                    _ => gl::RGB,
-                };
-                gl::GenTextures(1, &mut texture_location);
-                gl::BindTexture(gl::TEXTURE_2D, texture_location);
-                gl::TexImage2D(
-                    gl::TEXTURE_2D,
-                    0,
-                    format as i32,
-                    texture.width() as i32,
-                    texture.height() as i32,
-                    0,
-                    format,
-                    gl::UNSIGNED_BYTE,
-                    &texture_bytes[0] as *const _ as *const c_void,
-                );
-                gl::GenerateMipmap(gl::TEXTURE_2D);
-                texture_locations.push(texture_location);
-            }
 
             // Get uniforms
             let material = MaterialUniform {
@@ -200,8 +115,8 @@ impl ModelRenderer {
             }
             Ok(Self {
                 shader_id: program,
-                parsed_meshes: parsed_models,
-                textures: texture_locations,
+                parsed_meshes: HashMap::new(),
+                textures: HashMap::new(),
                 material_uniform: material,
                 camera_position_uniform,
                 projection_uniform,
@@ -209,19 +124,109 @@ impl ModelRenderer {
                 transformation_uniform,
                 point_light_uniform: point_lights,
                 dir_light_uniform: dir_lights,
-                materials,
             })
+        }
+    }
+
+    pub fn load_meshes(&mut self, meshes: Vec<Mesh>) {
+        unsafe {
+            gl::UseProgram(self.shader_id);
+
+            // Set up vertices and indices
+            for meshes in meshes {
+                let mut vao = 0;
+                let mut vbo = 0;
+                let mut ebo = 0;
+                gl::GenVertexArrays(1, &mut vao);
+                gl::GenBuffers(1, &mut vbo);
+                gl::GenBuffers(1, &mut ebo);
+                gl::BindVertexArray(vao);
+                gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+                gl::BufferData(
+                    gl::ARRAY_BUFFER,
+                    (meshes.vertices.len() * mem::size_of::<GLfloat>()) as GLsizeiptr,
+                    &meshes.vertices[0] as *const _ as *const c_void,
+                    gl::STATIC_DRAW,
+                );
+    
+                gl::BufferData(
+                    gl::ELEMENT_ARRAY_BUFFER,
+                    (meshes.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
+                    &meshes.indices[0] as *const _ as *const c_void,
+                    gl::STATIC_DRAW,
+                );
+
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, ebo);
+                let stride = 8 * mem::size_of::<GLfloat>() as i32;
+                gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, ptr::null());
+                gl::EnableVertexAttribArray(0);
+                let normal_start = 3 * mem::size_of::<GLfloat>() as i32;
+                gl::VertexAttribPointer(
+                    1,
+                    3,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    stride,
+                    normal_start as *mut c_void,
+                );
+                gl::EnableVertexAttribArray(1);
+                let tex_start = normal_start + (3 * mem::size_of::<GLfloat>() as i32);
+                gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, stride, tex_start as *mut c_void);
+                gl::EnableVertexAttribArray(2);
+
+                self.parsed_meshes.insert(
+                    meshes.name,
+                    ParsedMesh {
+                        vao,
+                        indices: meshes.indices,
+                        material: meshes.material,
+                    }
+                );
+            }
+        }
+    }
+
+    pub fn load_texture(&mut self, texture: Texture) {
+        unsafe {
+            gl::UseProgram(self.shader_id);
+
+            let Texture { name, image } = texture;
+            let mut texture_location = 0;
+            let texture_bytes = image.as_bytes();
+            let format = match image.color() {
+                ColorType::Rgb8 => gl::RGB,
+                ColorType::Rgba8 => gl::RGBA,
+                // TODO: Find what each color type should match to
+                _ => gl::RGB,
+            };
+            gl::GenTextures(1, &mut texture_location);
+            gl::BindTexture(gl::TEXTURE_2D, texture_location);
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                format as i32,
+                image.width() as i32,
+                image.height() as i32,
+                0,
+                format,
+                gl::UNSIGNED_BYTE,
+                &texture_bytes[0] as *const _ as *const c_void,
+            );
+            gl::GenerateMipmap(gl::TEXTURE_2D);
+            self.textures.insert(name, texture_location);
         }
     }
 
     pub fn draw(
         &self,
-        models: &[Model],
+        game_objects: &[GameObject],
         point_lights: &[PointLight],
         dir_lights: &[DirLight],
         camera_position: &XYZ,
         view: Matrix4<f32>,
         projection: Matrix4<f32>,
+        models: &HashMap<String, Vec<String>>,
+        materials: &HashMap<String, Material>,
     ) {
         unsafe {
             gl::UseProgram(self.shader_id);
@@ -276,10 +281,21 @@ impl ModelRenderer {
                 camera_position.z,
             );
 
-            for model in models {
-                for mesh_index in &model.meshes {
-                    let mesh = &self.parsed_meshes[*mesh_index];
-                    let material = &self.materials[mesh.material];
+            for go in game_objects {
+                let Some(meshes) = models.get(&go.model) else {
+                    error!(model = &go.model, "Can't Render Model That's Not Loaded");
+                    continue;
+                };
+                let parsed_meshes = meshes.iter()
+                    .filter_map(|ms| {
+                        let m = self.parsed_meshes.get(ms);
+                        if m.is_none() {
+                            error!(mesh = ms, "Can't Render Mesh That's Not Loaded");
+                        }
+                        m
+                    });
+                for mesh in parsed_meshes {
+                    let material = &materials[&mesh.material];
                     gl::BindVertexArray(mesh.vao);
                     gl::BufferData(
                         gl::ELEMENT_ARRAY_BUFFER,
@@ -288,8 +304,8 @@ impl ModelRenderer {
                         gl::STATIC_DRAW,
                     );
                     gl::ActiveTexture(gl::TEXTURE0);
-                    gl::BindTexture(gl::TEXTURE_2D, self.textures[material.diffuse_map]);
-                    let transform = model.transform.to_matrix4();
+                    gl::BindTexture(gl::TEXTURE_2D, self.textures[&material.diffuse_map]);
+                    let transform = go.transform.to_matrix4();
                     gl::UniformMatrix4fv(
                         self.transformation_uniform,
                         1,
@@ -311,7 +327,7 @@ impl ModelRenderer {
                     // Use Texture1 for specular
                     gl::Uniform1i(self.material_uniform.specular, 1);
                     gl::ActiveTexture(gl::TEXTURE1);
-                    gl::BindTexture(gl::TEXTURE_2D, self.textures[material.specular_map]);
+                    gl::BindTexture(gl::TEXTURE_2D, self.textures[&material.specular_map]);
                     gl::Uniform1i(self.material_uniform.shininess, material.specular_exponent as i32);
                     gl::DrawElements(
                         gl::TRIANGLES,
@@ -348,10 +364,10 @@ struct MaterialUniform {
     shininess: i32,
 }
 
-struct ParsedModel {
+struct ParsedMesh {
     vao: u32,
     indices: Vec<u32>,
-    material: usize,
+    material: String,
 }
 
 const TRANSFORMATION: &'static CStr =

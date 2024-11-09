@@ -1,13 +1,26 @@
-use std::{collections::HashMap, fmt::Debug, fs::OpenOptions, io::Read, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    fs::OpenOptions,
+    io::Read,
+};
 
+use anyhow::{Result, Context};
 use image::DynamicImage;
-use tracing::{warn, error};
+use tracing::{debug, warn};
+
+use super::manager::Loadable;
+
+pub struct Model {
+    pub meshes: Vec<Mesh>,
+    pub materials: Vec<String>,
+}
 
 pub struct Mesh {
     pub name: String,
     pub vertices: Vec<f32>,
     pub indices: Vec<u32>,
-    pub material: usize,
+    pub material: String,
 }
 
 impl Debug for Mesh {
@@ -16,27 +29,27 @@ impl Debug for Mesh {
     }
 }
 
-impl Mesh {
-    pub fn load(
-        obj_file: &PathBuf,
-        textures: &mut Vec<Texture>,
-        materials: &mut Vec<Material>) -> Vec<Self> {
-        let dir = obj_file.parent().unwrap();
+impl Loadable for Model {
+    type Output = Self;
+    fn load(file: &str) -> Result<Self> {
+        debug!(file = file, "Load Model");
+        let dir = find_dir(file);
         let mut file = OpenOptions::new()
             .read(true)
-            .open(obj_file)
+            .open(file)
             .unwrap();
 
         let mut text = String::new();
         file.read_to_string(&mut text).unwrap();
 
-        let mut meshes: Vec<Self> = Vec::new();
+        let mut meshes: Vec<Mesh> = Vec::new();
         let mut mesh_name: Option<String> = None;
         let mut pos_verts: Vec<f32> = Vec::new();
         let mut tex_verts: Vec<f32> = Vec::new();
         let mut norm_verts: Vec<f32> = Vec::new();
         let mut indices: Vec<Index> = Vec::new();
-        let mut material: Option<usize> = None;
+        let mut material: Option<String> = None;
+        let mut materials: Vec<String> = Vec::new();
 
         for line in text.lines() {
             if line.is_empty() || line.starts_with("#") {
@@ -45,20 +58,16 @@ impl Mesh {
             let parts: Vec<&str> = line.split(" ").collect();
             match parts[0] {
                 "mtllib" => {
-                    let mat_file = dir.join(parts[1]);
-                    materials.append(&mut Material::load(&mat_file, textures));
+                    let mat = parts[1];
+                    let mat_file = dir.to_string() + mat;
+                    debug!(mat_file = mat_file, "Load Material");
+                    materials.push(mat_file);
                 },
                 "usemtl" => {
-                    for i in 0..materials.len() {
-                        if materials[i].name == parts[1] {
-                            if let Some(_) = material {
-                                warn!("second-material-use");
-                            }
-                            material = Some(i);
-                            break;
-                        }
-                        error!(line = line, "material-not-loaded");
+                    if material.is_some() {
+                        warn!("second-material-use");
                     }
+                    material = Some(parts[1].to_string());
                 },
                 "v" => {
                     let mut elements = parse_elements(&parts[1..4]);
@@ -120,7 +129,7 @@ impl Mesh {
                                 indices_map.insert(*index, render_index);
                             }
                         }
-                        let mesh = Self {
+                        let mesh = Mesh {
                             name: mn,
                             material: mat,
                             vertices: vertices,
@@ -168,7 +177,7 @@ impl Mesh {
                     indices_map.insert(*index, render_index);
                 }
             }
-            let mesh = Self {
+            let mesh = Mesh {
                 name: mn,
                 material: mat,
                 vertices: vertices,
@@ -177,7 +186,10 @@ impl Mesh {
             meshes.push(mesh);
         }
 
-        meshes
+        Ok(Self {
+            meshes,
+            materials,
+        })
     }
 }
 
@@ -203,9 +215,9 @@ pub struct Material {
     pub dissolve: f32,
     // transmission_filter: (f32, f32, f32),
     pub optical_density: f32,
-    pub diffuse_map: usize,
+    pub diffuse_map: String,
     // pub normal_map: usize,
-    pub specular_map: usize,
+    pub specular_map: String,
     pub illumination_model: IlluminationModel,
 }
 
@@ -215,16 +227,18 @@ impl Debug for Material {
     }
 }
 
-impl Material {
-    pub fn load(filename: &PathBuf, textures: &mut Vec<Texture>) -> Vec<Self> {
+impl Loadable for Material {
+    type Output = Vec<Self>;
+    fn load(filename: &str) -> Result<Vec<Self>> {
+        debug!(file = filename, "Loading Material");
         let mut file = OpenOptions::new()
             .read(true)
             .open(filename)
-            .unwrap();
+            .context("Open Material File")?;
         let mut text = String::new();
-        file.read_to_string(&mut text).unwrap();
+        file.read_to_string(&mut text).context("Reading Material File")?;
 
-        let dir = filename.parent().unwrap();
+        let dir = find_dir(filename).to_string();
 
         let mut materials = Vec::new();
         let mut material_name: Option<String> = None;
@@ -235,8 +249,8 @@ impl Material {
         let mut dissolve: Option<f32> = None;
         // let mut transmission_filter: Option<(f32, f32, f32)> = None;
         let mut optical_density: Option<f32> = None;
-        let mut diffuse_map: Option<usize> = None;
-        let mut specular_map: Option<usize> = None;
+        let mut diffuse_map: Option<String> = None;
+        let mut specular_map: Option<String> = None;
         // let mut normal_map: Option<usize> = None;
         let mut illumination_model: Option<IlluminationModel> = None;
 
@@ -304,12 +318,12 @@ impl Material {
                     illumination_model = Some(IlluminationModel::parse(&parts[1]))
                 },
                 "map_Kd" => {
-                    let map_file = dir.join(parts[1]);
-                    diffuse_map = Some(load_or_use_texture(textures, map_file));
+                    let map_file = dir.clone() + parts[1];
+                    diffuse_map = Some(map_file);
                 },
                 "map_Ks" => {
-                    let map_file = dir.join(parts[1]);
-                    specular_map = Some(load_or_use_texture(textures, map_file));
+                    let map_file = dir.clone() + parts[1];
+                    specular_map = Some(map_file);
                 },
                 "map_Bump" => {
                     //let map_file = dir.join(parts[1]);
@@ -338,30 +352,26 @@ impl Material {
             };
             materials.push(material);
         }
-        materials
+        Ok(materials)
     }
-}
-
-fn load_or_use_texture(textures: &mut Vec<Texture>, file: PathBuf) -> usize {
-    let file_name = file.to_str().unwrap().to_string();
-    for i in 0..textures.len() {
-        if &textures[i].name == &file_name {
-            return i;
-        }
-    }
-    let texture = image::open(&file).unwrap();
-    let index = textures.len();
-    textures.push(Texture {
-        name: file_name,
-        image: texture,
-    });
-    index
 }
 
 #[derive(Debug)]
 pub struct Texture {
     pub name: String,
     pub image: DynamicImage,
+}
+
+impl Loadable for Texture {
+    type Output = Self;
+    fn load(file: &str) -> Result<Self> {
+        debug!(file = file, "Loading Texture");
+        let texture = image::open(&file).context("Loading Texture")?;
+        Ok(Texture {
+            name: file.to_string(),
+            image: texture,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -395,5 +405,13 @@ impl IlluminationModel {
             "10" => Self::CastsShadowsOntoInvisibleSurfaces,
             _ => panic!("unexpected illumination model"),
         }
+    }
+}
+
+fn find_dir(file: &str) -> &str {
+    let dir_index = file.rfind("/");
+    match dir_index {
+        Some(i) => &file[0..=i],
+        None => "",
     }
 }

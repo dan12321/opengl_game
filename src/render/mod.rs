@@ -1,23 +1,20 @@
 mod model_renderer;
 mod point_light_renderer;
-mod model_loader;
-mod outline_renderer;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 use std::path::PathBuf;
+use std::sync::{mpsc, Arc};
 
 use model_renderer::ModelRenderer;
 use gl;
 use gl::types::*;
-use image::DynamicImage;
-use model_loader::{Material, Mesh, Texture};
 use na::Perspective3;
-use outline_renderer::OutlineRenderer;
 use point_light_renderer::PointLightRenderer;
-use tracing::debug;
+use tracing::error;
 
-use crate::config::{OUTLINE_FRAG_SHADER, OUTLINE_VERT_SHADER};
+use crate::resource::manager::{DataResRec, DataResSender, ResourceManager};
+use crate::resource::model::{Material, Model, Texture};
 use crate::shader::PointLight;
 use crate::state::SceneState;
 
@@ -30,14 +27,26 @@ pub struct Renderer {
     light: PointLightRenderer,
     model: ModelRenderer,
     projection: Perspective3<GLfloat>,
-    outline: OutlineRenderer,
+    resource_manager: Arc<ResourceManager>,
+    loading_models: HashSet<String>,
+    models: HashMap<String, Vec<String>>,
+    model_sender: DataResSender<Model>,
+    model_rec: DataResRec<Model>,
+    loading_material_files: HashSet<String>,
+    material_files: HashSet<String>,
+    materials: HashMap<String, Material>,
+    material_sender: DataResSender<Vec<Material>>,
+    material_rec: DataResRec<Vec<Material>>,
+    loading_textures: HashSet<String>,
+    textures: HashSet<String>,
+    texture_sender: DataResSender<Texture>,
+    texture_rec: DataResRec<Texture>,
 }
 
 impl Renderer {
-    pub fn new(window_width: u32, window_height: u32) -> (Self, HashMap<String, ModelMeshes>) {
+    pub fn new(window_width: u32, window_height: u32, resource_manager: Arc<ResourceManager>) -> Self {
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
-            // gl::Enable(gl::STENCIL_TEST);
         }
         let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
         let fovy: GLfloat = PI / 2.0;
@@ -57,88 +66,152 @@ impl Renderer {
 
         let model_vert_shader = PathBuf::from(MODEL_VERT_SHADER);
         let texture_frag_shader = PathBuf::from(TEXTURE_FRAG_SHADER);
-        let outline_vert_shader = PathBuf::from(OUTLINE_VERT_SHADER);
-        let outline_frag_shader = PathBuf::from(OUTLINE_FRAG_SHADER);
-
-        // TODO: these should be loaded by a resource loader and passed in
-        // the renderer should not own model_meshes
-        let mut textures: Vec<Texture> = Vec::new();
-        let mut materials: Vec<Material> = Vec::new();
-        let mut meshes: Vec<Mesh> = Vec::new();
-        let mut model_meshes: HashMap<String, ModelMeshes> = HashMap::new();
-        let mut backpack = model_loader::Mesh::load(
-            &"assets/models/backpack/backpack.obj".into(),
-            &mut textures,
-            &mut materials,
-        );
-        let mut plane = model_loader::Mesh::load(
-            &"assets/models/plane/plane.obj".into(),
-             &mut textures,
-             &mut materials
-        );
-        let mut cube = model_loader::Mesh::load(
-            &"assets/models/cube/cube.obj".into(),
-             &mut textures,
-             &mut materials
-        );
-        model_meshes.insert("backpack".to_string(), ModelMeshes {
-            start: meshes.len(),
-            end: meshes.len() + backpack.len(),
-        });
-        meshes.append(&mut backpack);
-        model_meshes.insert("plane".to_string(), ModelMeshes {
-            start: meshes.len(),
-            end: meshes.len() + plane.len(),
-        });
-        meshes.append(&mut plane);
-        model_meshes.insert("cube".to_string(), ModelMeshes {
-            start: meshes.len(),
-            end: meshes.len() + cube.len(),
-        });
-        meshes.append(&mut cube);
-        debug!(model = format!("{:?}", &meshes), "loaded model");
-
-        let textures: Vec<DynamicImage> = textures.into_iter()
-            .map(|t| t.image)
-            .collect();
-        
-        let outline = OutlineRenderer::new(
-            &outline_vert_shader,
-            &outline_frag_shader,
-            &meshes,
-        ).unwrap();
 
         let model = ModelRenderer::new(
             &model_vert_shader,
             &texture_frag_shader,
-            meshes,
-            materials,
-            &textures,
         )
         .unwrap();
 
-        (Self {
+        let (model_sender, model_rec) = mpsc::channel();
+        let (material_sender, material_rec) = mpsc::channel();
+        let (texture_sender, texture_rec) = mpsc::channel();
+
+        Self {
             light,
             model,
             projection,
-            outline,
-        }, model_meshes)
+            resource_manager,
+            loading_models: HashSet::new(),
+            models: HashMap::new(),
+            loading_material_files: HashSet::new(),
+            material_files: HashSet::new(),
+            materials: HashMap::new(),
+            loading_textures: HashSet::new(),
+            textures: HashSet::new(),
+            model_sender,
+            model_rec,
+            material_sender,
+            material_rec,
+            texture_sender,
+            texture_rec,
+        }
     }
 
-    pub fn render(&self, state: &SceneState) {
+    pub fn update(&self, state: Option<&SceneState>) {
+        if let Some(s) = state {
+            self.render(s);
+        }
+    }
+
+    pub fn load_models(&mut self, models: Vec<String>) {
+        for model in models {
+            if self.loading_models.contains(&model) || self.models.contains_key(&model) {
+                continue;
+            }
+            self.resource_manager.load_model(model.clone(), self.model_sender.clone());
+            self.loading_models.insert(model);
+        }
+    }
+
+    pub fn load_materials(&mut self, materials: Vec<String>) {
+        for mat in materials {
+            if self.loading_material_files.contains(&mat) || self.materials.contains_key(&mat) {
+                continue;
+            }
+            self.resource_manager.load_material(mat.clone(), self.material_sender.clone());
+            self.loading_material_files.insert(mat);
+        }
+    }
+
+    pub fn load_textures(&mut self, textures: Vec<String>) {
+        for texture in textures {
+            if self.loading_textures.contains(&texture) || self.textures.contains(&texture) {
+                continue;
+            }
+            self.resource_manager.load_texture(texture.clone(), self.texture_sender.clone());
+            self.loading_textures.insert(texture);
+        }
+    }
+
+    pub fn loaded_check(&mut self) -> bool {
+        // Models
+        if !self.loading_models.is_empty() {
+            while let Ok((model_name, res)) = self.model_rec.try_recv() {
+                self.loading_models.remove(&model_name);
+                let materials = match res {
+                    Ok(Model { meshes, materials }) => {
+                        let ms: Vec<String> = meshes.iter()
+                            .map(|m| m.name.to_string())
+                            .collect();
+                        self.model.load_meshes(meshes);
+                        self.models.insert(model_name, ms);
+                        materials
+                    },
+                    Err(e) => {
+                        error!(error = e.backtrace().to_string(), model = &model_name, "Failed to load model");
+                        continue;
+                    }
+                };
+
+                self.load_materials(materials);
+            }
+        }
+
+        // Materials
+        if !self.loading_material_files.is_empty() {
+            while let Ok((material_name, res)) = self.material_rec.try_recv() {
+                self.loading_material_files.remove(&material_name);
+                let textures = match res {
+                    Ok(mats) => {
+                        let mut textures = Vec::new();
+                        for mat in mats {
+                            textures.push(mat.diffuse_map.clone());
+                            textures.push(mat.specular_map.clone());
+                            self.materials.insert(mat.name.clone(), mat);
+                        }
+                        self.material_files.insert(material_name);
+                        textures
+                    },
+                    Err(e) => {
+                        let error: String = e.chain().map(|s| s.to_string()).collect();
+                        error!(error = error, material = &material_name, "Failed to load material");
+                        continue;
+                    }
+                };
+
+                self.load_textures(textures);
+            }
+        }
+
+        // Textures
+        if !self.loading_textures.is_empty() {
+            while let Ok((texture_name, res)) = self.texture_rec.try_recv() {
+                self.loading_textures.remove(&texture_name);
+                match res {
+                    Ok(texture) => {
+                        self.model.load_texture(texture);
+                        self.textures.insert(texture_name);
+                    },
+                    Err(e) => {
+                        error!(error = e.to_string(), texture = &texture_name, "Failed to load Texture");
+                        continue;
+                    }
+                };
+            }
+        }
+
+        self.loading_models.is_empty() && self.loading_material_files.is_empty() && self.loading_textures.is_empty()  
+    }
+
+    fn render(&self, state: &SceneState) {
         clear();
-        // unsafe {
-        //     gl::Enable(gl::DEPTH_TEST);
-        //     gl::StencilOp(gl::KEEP, gl::KEEP, gl::REPLACE);
-        //     gl::StencilMask(0x00);
-        // }
         let view = state.camera.transform();
         let light_uniforms: Vec<PointLight> =
             state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
         self.light
             .draw(&state.point_lights, view, self.projection.as_matrix().clone());
 
-        // Non stenciled models
         self.model.draw(
             &[&state.cubes[..], &[state.player.model.clone()], state.plane.models.as_slice()].concat(),
             &light_uniforms,
@@ -146,47 +219,15 @@ impl Renderer {
             &state.camera.position().into(),
             view,
             self.projection.as_matrix().clone(),
+            &self.models,
+            &self.materials,
         );
-
-        // // Stenciled Models
-        // unsafe {
-        //     gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
-        //     gl::StencilMask(0xFF);
-        // }
-        // self.model.draw(
-        //     state.cubes.as_slice(),
-        //     &light_uniforms,
-        //     &state.dir_lights,
-        //     &state.camera.position().into(),
-        //     view,
-        //     self.projection.as_matrix().clone(),
-        // );
-        // unsafe {
-        //     gl::StencilFunc(gl::NOTEQUAL, 1, 0xFF);
-        //     gl::StencilMask(0x00);
-        //     gl::Disable(gl::DEPTH_TEST);
-        // }
-        // self.outline.draw(
-        //     state.cubes.as_slice(),
-        //     view,
-        //     self.projection.as_matrix().clone());
-        // unsafe {
-        //     gl::StencilMask(0xFF);
-        //     gl::StencilFunc(gl::ALWAYS, 1, 0xFF);
-        //     gl::Enable(gl::DEPTH_TEST);
-        // }
     }
-}
-
-pub struct ModelMeshes {
-    pub start: usize,
-    pub end: usize,
 }
 
 fn clear() {
     unsafe {
         gl::ClearColor(0.0, 0.0, 0.0, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
-        // gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
     }
 }
