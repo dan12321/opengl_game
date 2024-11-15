@@ -28,3 +28,16 @@ pub const CUBE_INDICES: [GLuint; 36] = [
     0, 1, 4, // right
     4, 5, 1,
 ];
+
+
+pub const QUAD_VERTICES: [GLfloat; 12] = [
+    0.0, 0.0, 0.0,
+    1.0, 0.0, 0.0,
+    0.0, 1.0, 0.0,
+    1.0, 1.0, 0.0,
+];
+
+pub const QUAD_INDICES: [GLuint; 6] = [
+    0, 1, 2,
+    1, 3, 2,
+];

@@ -25,6 +25,7 @@ pub struct Game {
     renderer: Renderer,
     resource_manager: Arc<ResourceManager>,
     map_loading: Option<Map>,
+    progress: f32,
     scene_resources: Option<SceneResources>,
     map_sender: Sender<(String, Result<Map>)>,
     map_receiver: Receiver<(String, Result<Map>)>,
@@ -62,6 +63,7 @@ impl Game {
                 SAD_MAP.to_string(),
                 UPBEAT_MAP.to_string(),
             ],
+            progress: 0.0,
         }
     }
 
@@ -82,16 +84,32 @@ impl Game {
             Status::Paused(scene) => scene.pause_update(controller),
             Status::Resetting(scene) => scene.resetting_update(),
         };
-        self.renderer.update(self.status.get_state());
+        self.renderer.update(self.status.get_state(), None);
         self
     }
 
-    fn load_map(&self, map: usize) -> Status {
+    fn load_map(&mut self, map: usize) -> Status {
         self.resource_manager.load_map(self.maps[map].clone(), self.map_sender.clone());
+        self.progress = 0.0;
         Status::Loading
     }
 
     fn loading_update(&mut self) -> Status {
+        let progress = ProgressBar {
+            transform: Transform {
+                position: (-0.5, -0.5, 0.0).into(),
+                scale: (1.0, 0.2, 1.0).into(),
+                rotation: Matrix4::identity(),
+            },
+            base_color: (0.0, 0.3, 0.7),
+            progress_color: (0.0, 0.7, 1.0),
+            progress: self.progress,
+        };
+        self.renderer.update(None, Some(&progress));
+
+        if self.progress < 0.1 {
+            self.progress += 0.0001;
+        }
         if self.map_loading.is_none() {
             let Ok((_, map)) = self.map_receiver.try_recv() else {
                 return Status::Loading;
@@ -102,11 +120,44 @@ impl Game {
             self.audio_manager.load_wavs(&wavs);
             self.map_loading = Some(map);
             debug!("Map Loaded");
+            if self.progress < 0.1 {
+                self.progress = 0.11;
+            }
         }
 
-        if !self.audio_manager.loaded_check() || !self.renderer.loaded_check() {
+        if self.progress < 0.65 {
+            self.progress += 0.00001;
+        }
+
+        if !self.audio_manager.loaded_check() {
             return Status::Loading;
         }
+
+        if self.progress < 0.65 {
+            self.progress = 0.66;
+        }
+
+        if self.progress < 1.0 {
+            self.progress += 0.00001;
+        }
+
+        if !self.renderer.loaded_check()  {
+            return Status::Loading;
+        }
+
+        self.progress = 1.0;
+
+        let progress = ProgressBar {
+            transform: Transform {
+                position: (-0.5, -0.5, 0.0).into(),
+                scale: (1.0, 0.2, 1.0).into(),
+                rotation: Matrix4::identity(),
+            },
+            base_color: (1.0, 0.0, 0.0),
+            progress_color: (0.0, 1.0, 0.0),
+            progress: self.progress,
+        };
+        self.renderer.update(None, Some(&progress));
 
         let audio_sender = self.audio_manager.get_sender();
 
@@ -501,6 +552,14 @@ pub struct PointLight {
     pub diffuse: (f32, f32, f32),
     pub specular: (f32, f32, f32),
     pub strength: f32,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ProgressBar {
+    pub transform: Transform,
+    pub base_color: (f32, f32, f32),
+    pub progress_color: (f32, f32, f32),
+    pub progress: f32,
 }
 
 impl PointLight {

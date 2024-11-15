@@ -1,5 +1,6 @@
 mod model_renderer;
 mod point_light_renderer;
+mod progress_renderer;
 
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
@@ -11,12 +12,15 @@ use gl;
 use gl::types::*;
 use na::Perspective3;
 use point_light_renderer::PointLightRenderer;
+use progress_renderer::ProgressRenderer;
 use tracing::error;
 
+use crate::config::{PROGRESS_FRAG_SHADER, PROGRESS_VERT_SHADER};
 use crate::resource::manager::{DataResRec, DataResSender, ResourceManager};
 use crate::resource::model::{Material, Model, Texture};
 use crate::shader::PointLight;
-use crate::state::SceneState;
+use crate::shape::{QUAD_INDICES, QUAD_VERTICES};
+use crate::state::{ProgressBar, SceneState};
 
 use super::config::{
     MODEL_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
@@ -26,6 +30,7 @@ use super::shape::{CUBE_INDICES, CUBE_VERTICES};
 pub struct Renderer {
     light: PointLightRenderer,
     model: ModelRenderer,
+    progress: ProgressRenderer,
     projection: Perspective3<GLfloat>,
     resource_manager: Arc<ResourceManager>,
     loading_models: HashSet<String>,
@@ -64,6 +69,16 @@ impl Renderer {
         )
         .unwrap();
 
+        let progress_vert_shader = PathBuf::from(PROGRESS_VERT_SHADER);
+        let progress_frag_shader = PathBuf::from(PROGRESS_FRAG_SHADER);
+        let progress = ProgressRenderer::new(
+            &progress_vert_shader,
+            &progress_frag_shader,
+            &QUAD_VERTICES,
+            &QUAD_INDICES,
+        )
+        .unwrap();
+
         let model_vert_shader = PathBuf::from(MODEL_VERT_SHADER);
         let texture_frag_shader = PathBuf::from(TEXTURE_FRAG_SHADER);
 
@@ -80,6 +95,7 @@ impl Renderer {
         Self {
             light,
             model,
+            progress,
             projection,
             resource_manager,
             loading_models: HashSet::new(),
@@ -98,9 +114,11 @@ impl Renderer {
         }
     }
 
-    pub fn update(&self, state: Option<&SceneState>) {
+    pub fn update(&self, state: Option<&SceneState>, progress: Option<&ProgressBar>) {
         if let Some(s) = state {
             self.render(s);
+        } else if let Some(p) = progress {
+            self.render_loading(p);
         }
     }
 
@@ -222,6 +240,11 @@ impl Renderer {
             &self.models,
             &self.materials,
         );
+    }
+
+    fn render_loading(&self, progress: &ProgressBar) {
+        clear();
+        self.progress.draw(progress);
     }
 }
 
