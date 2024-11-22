@@ -153,7 +153,7 @@ impl Renderer {
         }
     }
 
-    pub fn loaded_check(&mut self) -> bool {
+    pub fn loaded_check(&mut self) -> (usize, usize) {
         // Models
         if !self.loading_models.is_empty() {
             while let Ok((model_name, res)) = self.model_rec.try_recv() {
@@ -230,9 +230,9 @@ impl Renderer {
             }
         }
 
-        self.loading_models.is_empty()
-            && self.loading_material_files.is_empty()
-            && self.loading_textures.is_empty()
+        let loaded_assets = self.models.len() + self.materials.len() + self.textures.len();
+        let loading_assets = self.loading_models.len() + self.loading_material_files.len() + self.loading_textures.len();
+        (loading_assets, loaded_assets)
     }
 
     fn render(&self, state: &SceneState) {

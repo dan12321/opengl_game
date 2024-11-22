@@ -76,13 +76,6 @@ fn main() {
         last_time = current_time;
 
         controller.poll_input(&mut window);
-        for button in controller.buttons() {
-            match button {
-                Button::Quit => window.set_should_close(true),
-                _ => (),
-            }
-        }
-
         game = game.update(delta_time, &controller, &mut window);
     }
 }

@@ -87,7 +87,7 @@ impl AudioManager {
         self.wavs.write().unwrap().remove(wav);
     }
 
-    pub fn loaded_check(&mut self) -> bool {
+    pub fn loaded_check(&mut self) -> (usize, usize) {
         if !self.loading_files.is_empty() {
             let mut new_wavs = Vec::with_capacity(self.loading_files.len());
             while let Ok((file, res)) = self.resource_rec.try_recv() {
@@ -112,7 +112,7 @@ impl AudioManager {
                 }
             }
         }
-        self.loading_files.is_empty()
+        (self.loading_files.len(), self.loaded_files.len())
     }
 
     pub fn get_sender(&self) -> Sender<AudioAction> {

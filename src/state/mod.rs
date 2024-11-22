@@ -109,7 +109,7 @@ impl Game {
             },
             base_color: (0.0, 0.3, 0.7),
             progress_color: (0.0, 0.7, 1.0),
-            progress: self.progress,
+            progress: f32::min(self.progress, 1.0),
         };
         self.renderer.update(None, Some(&progress));
 
@@ -131,39 +131,24 @@ impl Game {
             }
         }
 
-        if self.progress < 0.65 {
-            self.progress += 0.00001;
+        let (loading_audio, loaded_audio) = self.audio_manager.loaded_check();
+        let (loading_models, loaded_models) = self.renderer.loaded_check();
+        
+        if loading_audio + loading_models == 0 {
+            // TODO: Base this on delta time instead of being frame rate dependant
+            self.progress += 0.0001;
+        } else {
+            let loaded_assets = loaded_audio + loaded_models;
+            let loading_total = loaded_assets + loading_audio + loading_models;
+            let target_progress = 0.1 + 0.9 * (loaded_assets as f32 / loading_total as f32);
+            let mut delta = target_progress - self.progress;
+            delta = f32::max(delta, 0.0);
+            self.progress += delta * delta / 600.0;
         }
-
-        if !self.audio_manager.loaded_check() {
+        // We want a chance for this to be full
+        if self.progress <= 1.2 {
             return Status::Loading;
         }
-
-        if self.progress < 0.65 {
-            self.progress = 0.66;
-        }
-
-        if self.progress < 1.0 {
-            self.progress += 0.00001;
-        }
-
-        if !self.renderer.loaded_check() {
-            return Status::Loading;
-        }
-
-        self.progress = 1.0;
-
-        let progress = ProgressBar {
-            transform: Transform {
-                position: (-0.5, -0.5, 0.0).into(),
-                scale: (1.0, 0.2, 1.0).into(),
-                rotation: Matrix4::identity(),
-            },
-            base_color: (1.0, 0.0, 0.0),
-            progress_color: (0.0, 1.0, 0.0),
-            progress: self.progress,
-        };
-        self.renderer.update(None, Some(&progress));
 
         let audio_sender = self.audio_manager.get_sender();
 
