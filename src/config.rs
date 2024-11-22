@@ -5,6 +5,12 @@ pub const LIGHT_VERT_SHADER: &'static str = "assets/shaders/light.vert";
 pub const LIGHT_FRAG_SHADER: &'static str = "assets/shaders/light.frag";
 pub const PROGRESS_VERT_SHADER: &'static str = "assets/shaders/progress_bar.vert";
 pub const PROGRESS_FRAG_SHADER: &'static str = "assets/shaders/progress_bar.frag";
+pub const DEATH_TRACK: &'static str = "test.wav";
+pub const SAD_MAP: &'static str = "sad_melodica.txt";
+pub const UPBEAT_MAP: &'static str = "upbeat.txt";
+pub const CUBE_MODEL: &'static str = "cube/cube.obj";
+pub const PLANE_MODEL: &'static str = "plane/plane.obj";
+pub const BACKPACK_MODEL: &'static str = "backpack/backpack.obj";
 
 // Movement
 pub const MOVE_SPEED: f32 = 15.0;

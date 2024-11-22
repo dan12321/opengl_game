@@ -8,7 +8,10 @@ use tracing::debug;
 
 use crate::audio::{AudioAction, AudioManager};
 use crate::camera::Camera;
-use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
+use crate::config::{
+    self, BACKPACK_MODEL, BEAT_SIZE, COLUMN_WIDTH, CUBE_MODEL, DEATH_TRACK, PLANE_LENGTH,
+    PLANE_MODEL, PLANE_WIDTH, SAD_MAP, UPBEAT_MAP,
+};
 use crate::controller::{Button, Controller};
 use crate::physics::AABBColider;
 use crate::render::Renderer;
@@ -640,11 +643,3 @@ pub enum PlayerStatus {
 struct SceneResources {
     music: Option<String>,
 }
-
-const DEATH_TRACK: &'static str = "test.wav";
-const SAD_MAP: &'static str = "sad_melodica.txt";
-const UPBEAT_MAP: &'static str = "upbeat.txt";
-const CUBE_MODEL: &'static str = "cube/cube.obj";
-const PLANE_MODEL: &'static str = "plane/plane.obj";
-const BACKPACK_MODEL: &'static str = "backpack/backpack.obj";
-
