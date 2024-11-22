@@ -4,11 +4,10 @@ use std::path::PathBuf;
 use std::ptr;
 
 use crate::shader::{create_shader, OpenGLError};
-use crate::state::{PointLight, ProgressBar};
+use crate::state::{ProgressBar};
 
 use gl;
 use gl::types::*;
-use na::Matrix4;
 
 pub struct ProgressRenderer {
     shader_id: u32,
@@ -137,5 +136,6 @@ impl ProgressRenderer {
 const TRANSFORMATION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"transformation\0") };
 const PROGRESS: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"progress\0") };
-const PROGRESS_COLOR: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"progress_color\0") };
+const PROGRESS_COLOR: &'static CStr =
+    unsafe { CStr::from_bytes_with_nul_unchecked(b"progress_color\0") };
 const BASE_COLOR: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"base_color\0") };

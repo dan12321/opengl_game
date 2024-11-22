@@ -7,9 +7,9 @@ use std::f32::consts::PI;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 
-use model_renderer::ModelRenderer;
 use gl;
 use gl::types::*;
+use model_renderer::ModelRenderer;
 use na::Perspective3;
 use point_light_renderer::PointLightRenderer;
 use progress_renderer::ProgressRenderer;
@@ -22,9 +22,7 @@ use crate::shader::PointLight;
 use crate::shape::{QUAD_INDICES, QUAD_VERTICES};
 use crate::state::{ProgressBar, SceneState};
 
-use super::config::{
-    MODEL_VERT_SHADER, LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, TEXTURE_FRAG_SHADER,
-};
+use super::config::{LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, MODEL_VERT_SHADER, TEXTURE_FRAG_SHADER};
 use super::shape::{CUBE_INDICES, CUBE_VERTICES};
 
 pub struct Renderer {
@@ -49,7 +47,11 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window_width: u32, window_height: u32, resource_manager: Arc<ResourceManager>) -> Self {
+    pub fn new(
+        window_width: u32,
+        window_height: u32,
+        resource_manager: Arc<ResourceManager>,
+    ) -> Self {
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
         }
@@ -82,11 +84,7 @@ impl Renderer {
         let model_vert_shader = PathBuf::from(MODEL_VERT_SHADER);
         let texture_frag_shader = PathBuf::from(TEXTURE_FRAG_SHADER);
 
-        let model = ModelRenderer::new(
-            &model_vert_shader,
-            &texture_frag_shader,
-        )
-        .unwrap();
+        let model = ModelRenderer::new(&model_vert_shader, &texture_frag_shader).unwrap();
 
         let (model_sender, model_rec) = mpsc::channel();
         let (material_sender, material_rec) = mpsc::channel();
@@ -127,7 +125,8 @@ impl Renderer {
             if self.loading_models.contains(&model) || self.models.contains_key(&model) {
                 continue;
             }
-            self.resource_manager.load_model(model.clone(), self.model_sender.clone());
+            self.resource_manager
+                .load_model(model.clone(), self.model_sender.clone());
             self.loading_models.insert(model);
         }
     }
@@ -137,7 +136,8 @@ impl Renderer {
             if self.loading_material_files.contains(&mat) || self.materials.contains_key(&mat) {
                 continue;
             }
-            self.resource_manager.load_material(mat.clone(), self.material_sender.clone());
+            self.resource_manager
+                .load_material(mat.clone(), self.material_sender.clone());
             self.loading_material_files.insert(mat);
         }
     }
@@ -147,7 +147,8 @@ impl Renderer {
             if self.loading_textures.contains(&texture) || self.textures.contains(&texture) {
                 continue;
             }
-            self.resource_manager.load_texture(texture.clone(), self.texture_sender.clone());
+            self.resource_manager
+                .load_texture(texture.clone(), self.texture_sender.clone());
             self.loading_textures.insert(texture);
         }
     }
@@ -159,15 +160,17 @@ impl Renderer {
                 self.loading_models.remove(&model_name);
                 let materials = match res {
                     Ok(Model { meshes, materials }) => {
-                        let ms: Vec<String> = meshes.iter()
-                            .map(|m| m.name.to_string())
-                            .collect();
+                        let ms: Vec<String> = meshes.iter().map(|m| m.name.to_string()).collect();
                         self.model.load_meshes(meshes);
                         self.models.insert(model_name, ms);
                         materials
-                    },
+                    }
                     Err(e) => {
-                        error!(error = e.backtrace().to_string(), model = &model_name, "Failed to load model");
+                        error!(
+                            error = e.backtrace().to_string(),
+                            model = &model_name,
+                            "Failed to load model"
+                        );
                         continue;
                     }
                 };
@@ -190,10 +193,14 @@ impl Renderer {
                         }
                         self.material_files.insert(material_name);
                         textures
-                    },
+                    }
                     Err(e) => {
                         let error: String = e.chain().map(|s| s.to_string()).collect();
-                        error!(error = error, material = &material_name, "Failed to load material");
+                        error!(
+                            error = error,
+                            material = &material_name,
+                            "Failed to load material"
+                        );
                         continue;
                     }
                 };
@@ -210,28 +217,45 @@ impl Renderer {
                     Ok(texture) => {
                         self.model.load_texture(texture);
                         self.textures.insert(texture_name);
-                    },
+                    }
                     Err(e) => {
-                        error!(error = e.to_string(), texture = &texture_name, "Failed to load Texture");
+                        error!(
+                            error = e.to_string(),
+                            texture = &texture_name,
+                            "Failed to load Texture"
+                        );
                         continue;
                     }
                 };
             }
         }
 
-        self.loading_models.is_empty() && self.loading_material_files.is_empty() && self.loading_textures.is_empty()  
+        self.loading_models.is_empty()
+            && self.loading_material_files.is_empty()
+            && self.loading_textures.is_empty()
     }
 
     fn render(&self, state: &SceneState) {
         clear();
         let view = state.camera.transform();
-        let light_uniforms: Vec<PointLight> =
-            state.point_lights.iter().map(|l| l.as_light_uniforms()).collect();
-        self.light
-            .draw(&state.point_lights, view, self.projection.as_matrix().clone());
+        let light_uniforms: Vec<PointLight> = state
+            .point_lights
+            .iter()
+            .map(|l| l.as_light_uniforms())
+            .collect();
+        self.light.draw(
+            &state.point_lights,
+            view,
+            self.projection.as_matrix().clone(),
+        );
 
         self.model.draw(
-            &[&state.cubes[..], &[state.player.model.clone()], state.plane.models.as_slice()].concat(),
+            &[
+                &state.cubes[..],
+                &[state.player.model.clone()],
+                state.plane.models.as_slice(),
+            ]
+            .concat(),
             &light_uniforms,
             &state.dir_lights,
             &state.camera.position().into(),

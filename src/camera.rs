@@ -28,10 +28,12 @@ impl Camera {
 
     pub fn transform(&self) -> Matrix4<GLfloat> {
         let y_axis = Vector3::y_axis();
-        let x_axis: na::Unit<na::Matrix<f32, na::Const<3>, na::Const<1>, na::ArrayStorage<f32, 3, 1>>> = Vector3::x_axis();
-        let latitude_rotation =
-            Rotation3::from_axis_angle(&x_axis, self.latitude).to_homogeneous();
-        let longitude_rotation = Rotation3::from_axis_angle(&y_axis, self.longitude).to_homogeneous();
+        let x_axis: na::Unit<
+            na::Matrix<f32, na::Const<3>, na::Const<1>, na::ArrayStorage<f32, 3, 1>>,
+        > = Vector3::x_axis();
+        let latitude_rotation = Rotation3::from_axis_angle(&x_axis, self.latitude).to_homogeneous();
+        let longitude_rotation =
+            Rotation3::from_axis_angle(&y_axis, self.longitude).to_homogeneous();
         let relative_position_homogeneous =
             longitude_rotation * latitude_rotation * vector![0.0, 0.0, -self.distance, 1.0];
         let relative_position = vector![
@@ -52,7 +54,8 @@ impl Camera {
         let x_axis = Vector3::x_axis();
         let longitude_rotation =
             Rotation3::from_axis_angle(&x_axis, self.latitude).to_homogeneous();
-        let latitude_rotation = Rotation3::from_axis_angle(&y_axis, self.longitude).to_homogeneous();
+        let latitude_rotation =
+            Rotation3::from_axis_angle(&y_axis, self.longitude).to_homogeneous();
         let relative_position_homogeneous =
             latitude_rotation * longitude_rotation * vector![0.0, 0.0, -self.distance, 1.0];
         let relative_position = vector![

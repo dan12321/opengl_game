@@ -1,9 +1,4 @@
-use std::{
-    error::Error,
-    fmt::Display,
-    fs::OpenOptions,
-    io::Read,
-};
+use std::{error::Error, fmt::Display, fs::OpenOptions, io::Read};
 
 use anyhow::Result;
 use tracing::debug;
@@ -22,7 +17,7 @@ pub struct Wav {
 
 impl Loadable for Wav {
     type Output = Self;
-    fn load(path: &str) -> Result<Self>{
+    fn load(path: &str) -> Result<Self> {
         let mut file = OpenOptions::new().read(true).open(&path)?;
 
         let mut file_header: [u8; WAV_HEADER_SIZE] = [0; WAV_HEADER_SIZE];
@@ -50,9 +45,9 @@ impl Loadable for Wav {
 
         let samples = unsafe {
             let mut sample_buffer: Vec<u8> = Vec::with_capacity(data_size as usize);
-            let ds = data_size  as usize;
+            let ds = data_size as usize;
             sample_buffer.set_len(ds);
-            // TODO: Fix interrupt handling. n often less than ds. 
+            // TODO: Fix interrupt handling. n often less than ds.
             let _ = file.read(&mut sample_buffer)?;
             // if n != ds {
             //     return Err(ParseWavError::DataSizeInconsistent(n, ds).into());
@@ -107,10 +102,15 @@ enum ParseWavError {
 impl Display for ParseWavError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::HeaderTooSmall(bytes) => write!(f, "Expected {} bytes in header but only found {}", WAV_HEADER_SIZE, bytes),
+            Self::HeaderTooSmall(bytes) => write!(
+                f,
+                "Expected {} bytes in header but only found {}",
+                WAV_HEADER_SIZE, bytes
+            ),
             // Self::DataSizeInconsistent(bytes, expected) => write!(f, "Expected {} bytes in data but found {}", expected, bytes),
         }
     }
 }
 
 impl Error for ParseWavError {}
+

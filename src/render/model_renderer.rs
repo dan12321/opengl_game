@@ -1,5 +1,9 @@
 use std::{
-    collections::HashMap, ffi::{c_void, CStr, CString}, mem, path::PathBuf, ptr
+    collections::HashMap,
+    ffi::{c_void, CStr, CString},
+    mem,
+    path::PathBuf,
+    ptr,
 };
 
 use gl::types::*;
@@ -8,7 +12,12 @@ use na::Matrix4;
 use tracing::error;
 
 use crate::{
-    resource::model::Texture, shader::{create_shader, template_dir_light, template_point_light, DirLight, DirLightProp, OpenGLError, PointLight, PointLightProp}, state::{GameObject, XYZ}
+    resource::model::Texture,
+    shader::{
+        create_shader, template_dir_light, template_point_light, DirLight, DirLightProp,
+        OpenGLError, PointLight, PointLightProp,
+    },
+    state::{GameObject, XYZ},
 };
 
 use crate::resource::model::{Material, Mesh};
@@ -27,10 +36,7 @@ pub struct ModelRenderer {
 }
 
 impl ModelRenderer {
-    pub fn new(
-        vert_shader: &PathBuf,
-        frag_shader: &PathBuf,
-    ) -> Result<Self, OpenGLError> {
+    pub fn new(vert_shader: &PathBuf, frag_shader: &PathBuf) -> Result<Self, OpenGLError> {
         unsafe {
             // Create program
             let vert = create_shader(vert_shader, gl::VERTEX_SHADER)?;
@@ -148,7 +154,7 @@ impl ModelRenderer {
                     &meshes.vertices[0] as *const _ as *const c_void,
                     gl::STATIC_DRAW,
                 );
-    
+
                 gl::BufferData(
                     gl::ELEMENT_ARRAY_BUFFER,
                     (meshes.indices.len() * mem::size_of::<GLuint>()) as GLsizeiptr,
@@ -171,7 +177,14 @@ impl ModelRenderer {
                 );
                 gl::EnableVertexAttribArray(1);
                 let tex_start = normal_start + (3 * mem::size_of::<GLfloat>() as i32);
-                gl::VertexAttribPointer(2, 2, gl::FLOAT, gl::FALSE, stride, tex_start as *mut c_void);
+                gl::VertexAttribPointer(
+                    2,
+                    2,
+                    gl::FLOAT,
+                    gl::FALSE,
+                    stride,
+                    tex_start as *mut c_void,
+                );
                 gl::EnableVertexAttribArray(2);
 
                 self.parsed_meshes.insert(
@@ -180,7 +193,7 @@ impl ModelRenderer {
                         vao,
                         indices: meshes.indices,
                         material: meshes.material,
-                    }
+                    },
                 );
             }
         }
@@ -250,7 +263,10 @@ impl ModelRenderer {
                     point_lights[i].specular.1,
                     point_lights[i].specular.2,
                 );
-                gl::Uniform1f(self.point_light_uniform[i].strength, point_lights[i].strength);
+                gl::Uniform1f(
+                    self.point_light_uniform[i].strength,
+                    point_lights[i].strength,
+                );
             }
             for i in 0..dir_lights.len() {
                 gl::Uniform3f(
@@ -286,14 +302,13 @@ impl ModelRenderer {
                     error!(model = &go.model, "Can't Render Model That's Not Loaded");
                     continue;
                 };
-                let parsed_meshes = meshes.iter()
-                    .filter_map(|ms| {
-                        let m = self.parsed_meshes.get(ms);
-                        if m.is_none() {
-                            error!(mesh = ms, "Can't Render Mesh That's Not Loaded");
-                        }
-                        m
-                    });
+                let parsed_meshes = meshes.iter().filter_map(|ms| {
+                    let m = self.parsed_meshes.get(ms);
+                    if m.is_none() {
+                        error!(mesh = ms, "Can't Render Mesh That's Not Loaded");
+                    }
+                    m
+                });
                 for mesh in parsed_meshes {
                     let material = &materials[&mesh.material];
                     gl::BindVertexArray(mesh.vao);
@@ -328,7 +343,10 @@ impl ModelRenderer {
                     gl::Uniform1i(self.material_uniform.specular, 1);
                     gl::ActiveTexture(gl::TEXTURE1);
                     gl::BindTexture(gl::TEXTURE_2D, self.textures[&material.specular_map]);
-                    gl::Uniform1i(self.material_uniform.shininess, material.specular_exponent as i32);
+                    gl::Uniform1i(
+                        self.material_uniform.shininess,
+                        material.specular_exponent as i32,
+                    );
                     gl::DrawElements(
                         gl::TRIANGLES,
                         mesh.indices.len() as i32,
@@ -372,7 +390,7 @@ struct ParsedMesh {
 
 const TRANSFORMATION: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"transformation\0") };
-    
+
 const PROJECTION: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"projection\0") };
 const VIEW: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"view\0") };
 const CAMERA_POSITION: &'static CStr =

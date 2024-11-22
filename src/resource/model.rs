@@ -1,11 +1,6 @@
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    fs::OpenOptions,
-    io::Read,
-};
+use std::{collections::HashMap, fmt::Debug, fs::OpenOptions, io::Read};
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use image::DynamicImage;
 use tracing::{debug, warn};
 
@@ -25,7 +20,14 @@ pub struct Mesh {
 
 impl Debug for Mesh {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Mesh {{ name: {:?}, vertices: {:?}, indices: {:?}, material: {:?} }}", self.name, &self.vertices[0..24], &self.indices[0..3], self.material)
+        write!(
+            f,
+            "Mesh {{ name: {:?}, vertices: {:?}, indices: {:?}, material: {:?} }}",
+            self.name,
+            &self.vertices[0..24],
+            &self.indices[0..3],
+            self.material
+        )
     }
 }
 
@@ -34,10 +36,7 @@ impl Loadable for Model {
     fn load(file: &str) -> Result<Self> {
         debug!(file = file, "Load Model");
         let dir = find_dir(file);
-        let mut file = OpenOptions::new()
-            .read(true)
-            .open(file)
-            .unwrap();
+        let mut file = OpenOptions::new().read(true).open(file).unwrap();
 
         let mut text = String::new();
         file.read_to_string(&mut text).unwrap();
@@ -62,35 +61,34 @@ impl Loadable for Model {
                     let mat_file = dir.to_string() + mat;
                     debug!(mat_file = mat_file, "Load Material");
                     materials.push(mat_file);
-                },
+                }
                 "usemtl" => {
                     if material.is_some() {
                         warn!("second-material-use");
                     }
                     material = Some(parts[1].to_string());
-                },
+                }
                 "v" => {
                     let mut elements = parse_elements(&parts[1..4]);
                     pos_verts.append(&mut elements);
-                },
+                }
                 "vt" => {
                     let mut elements = parse_elements(&parts[1..3]);
                     tex_verts.append(&mut elements);
-                },
+                }
                 "vn" => {
                     let mut elements = parse_elements(&parts[1..4]);
                     norm_verts.append(&mut elements);
-                },
+                }
                 "vp" => {
                     warn!(line = line, "parameter-space-not-supported");
-                },
+                }
                 "f" => {
                     for face in &parts[1..4] {
                         // TODO: Technically this could be negative but haven't seen
                         // that in practice, for now just crash
-                        let index: Vec<usize> = face.split("/")
-                            .map(|s| s.parse().unwrap())
-                            .collect();
+                        let index: Vec<usize> =
+                            face.split("/").map(|s| s.parse().unwrap()).collect();
                         // Assume all 3 specified
                         indices.push(Index {
                             pos: index[0] - 1,
@@ -98,7 +96,6 @@ impl Loadable for Model {
                             norm: index[2] - 1,
                         });
                     }
-
                 }
                 "o" => {
                     if let Some(mn) = mesh_name {
@@ -108,7 +105,8 @@ impl Loadable for Model {
                         // correct format for rendering
                         let mut vertices = Vec::with_capacity(indices.len() * 8);
                         let mut render_indices = Vec::with_capacity(indices.len());
-                        let mut indices_map: HashMap<Index, u32> = HashMap::with_capacity(indices.len());
+                        let mut indices_map: HashMap<Index, u32> =
+                            HashMap::with_capacity(indices.len());
                         for index in &indices {
                             if let Some(render_index) = indices_map.get(index) {
                                 render_indices.push(*render_index);
@@ -142,10 +140,10 @@ impl Loadable for Model {
                     // larger
                     indices.clear();
                     material = None;
-                },
+                }
                 _ => {
                     warn!(line = line, "unexpected-obj-line-type");
-                },
+                }
             }
         }
 
@@ -186,17 +184,12 @@ impl Loadable for Model {
             meshes.push(mesh);
         }
 
-        Ok(Self {
-            meshes,
-            materials,
-        })
+        Ok(Self { meshes, materials })
     }
 }
 
 fn parse_elements(parts: &[&str]) -> Vec<f32> {
-    parts.iter()
-        .map(|p| p.parse().unwrap())
-        .collect()
+    parts.iter().map(|p| p.parse().unwrap()).collect()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -223,7 +216,11 @@ pub struct Material {
 
 impl Debug for Material {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Material {{ name: {:?}, ambient: {:?}, diffuse: {:?}, specular_color: {:?} }}", self.name, self.ambient, self.diffuse, self.specular_color)
+        write!(
+            f,
+            "Material {{ name: {:?}, ambient: {:?}, diffuse: {:?}, specular_color: {:?} }}",
+            self.name, self.ambient, self.diffuse, self.specular_color
+        )
     }
 }
 
@@ -236,7 +233,8 @@ impl Loadable for Material {
             .open(filename)
             .context("Open Material File")?;
         let mut text = String::new();
-        file.read_to_string(&mut text).context("Reading Material File")?;
+        file.read_to_string(&mut text)
+            .context("Reading Material File")?;
 
         let dir = find_dir(filename).to_string();
 
@@ -280,32 +278,31 @@ impl Loadable for Material {
                         materials.push(material);
                     }
                     material_name = Some(parts[1].to_string());
-                },
+                }
                 "Ka" => {
                     let rbg = parse_elements(&parts[1..4]);
                     ambient = Some((rbg[0], rbg[1], rbg[2]));
-                },
+                }
                 "Kd" => {
                     let rbg = parse_elements(&parts[1..4]);
                     diffuse = Some((rbg[0], rbg[1], rbg[2]));
-                },
+                }
                 "Ks" => {
                     let rbg = parse_elements(&parts[1..4]);
                     specular_color = Some((rbg[0], rbg[1], rbg[2]));
-                },
+                }
                 "Ns" => {
                     let exp: f32 = parts[1].parse().unwrap();
                     specular_exponent = Some(exp);
-                },
+                }
                 "d" => {
                     let dis: f32 = parts[1].parse().unwrap();
                     dissolve = Some(dis);
-                },
+                }
                 "Tr" => {
                     let tr: f32 = parts[1].parse().unwrap();
                     dissolve = Some(1.0 - tr);
-
-                },
+                }
                 // "Tf" => {
                 //     let rbg = parse_elements(&parts[1..4]);
                 //     transmission_filter = Some((rbg[0], rbg[1], rbg[2]));
@@ -313,22 +310,20 @@ impl Loadable for Material {
                 "Ni" => {
                     let ni: f32 = parts[1].parse().unwrap();
                     optical_density = Some(ni);
-                },
-                "illum" => {
-                    illumination_model = Some(IlluminationModel::parse(&parts[1]))
-                },
+                }
+                "illum" => illumination_model = Some(IlluminationModel::parse(&parts[1])),
                 "map_Kd" => {
                     let map_file = dir.clone() + parts[1];
                     diffuse_map = Some(map_file);
-                },
+                }
                 "map_Ks" => {
                     let map_file = dir.clone() + parts[1];
                     specular_map = Some(map_file);
-                },
+                }
                 "map_Bump" => {
                     //let map_file = dir.join(parts[1]);
                     // normal_map = Some(load_or_use_texture(textures, map_file));
-                },
+                }
                 "" => (),
                 _ => {
                     warn!(line = line, "unexpected-mtl-line-type");
@@ -415,3 +410,4 @@ fn find_dir(file: &str) -> &str {
         None => "",
     }
 }
+

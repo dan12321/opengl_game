@@ -1,12 +1,6 @@
-use std::{
-    error::Error,
-    fmt::Display,
-    fs::OpenOptions,
-    io::Read,
-    num::ParseFloatError,
-};
+use std::{error::Error, fmt::Display, fs::OpenOptions, io::Read, num::ParseFloatError};
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use tracing::debug;
 
 use super::manager::Loadable;
@@ -30,15 +24,15 @@ impl Loadable for Map {
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
         let mut lines = buf.lines().filter(|l| !l.starts_with("//"));
-        let version: u64 = lines.next()
+        let version: u64 = lines
+            .next()
             .ok_or(MapError::MissingVersion)?
             .trim()
             .parse()
             .context("Parsing Map Version")?;
         let metadata = lines.next().ok_or(MapError::MissingMetadata)?;
-        let metadata_parts: Result<Vec<f32>, ParseFloatError> = metadata.split(",")
-            .map(|s| s.parse())
-            .collect();
+        let metadata_parts: Result<Vec<f32>, ParseFloatError> =
+            metadata.split(",").map(|s| s.parse()).collect();
         let metadata_parts = metadata_parts.context("Parsing Map Metadata")?;
         if metadata_parts.len() != 3 {
             return Err(MapError::BadMetadata(metadata_parts.len()).into());
@@ -79,9 +73,10 @@ impl Display for MapError {
             Self::MissingVersion => write!(f, "Missing Version"),
             Self::MissingMetadata => write!(f, "Missing Metadata"),
             Self::MissingSongData => write!(f, "Missing Song Data"),
-            Self::BadMetadata(n) => write!(f, "Found {} metadata arguments", n)
+            Self::BadMetadata(n) => write!(f, "Found {} metadata arguments", n),
         }
     }
 }
 
 impl Error for MapError {}
+

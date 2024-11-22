@@ -50,12 +50,7 @@ impl AudioManager {
         let audio_thread_wavs = wavs.clone();
 
         thread::spawn(move || {
-            let mut audio_thread = Mixer::new(
-                receiver,
-                device,
-                config.into(),
-                audio_thread_wavs,
-            );
+            let mut audio_thread = Mixer::new(receiver, device, config.into(), audio_thread_wavs);
             audio_thread.run();
         });
 
@@ -77,7 +72,8 @@ impl AudioManager {
     pub fn load_wavs(&mut self, wavs: &[&str]) {
         debug!("Load Wavs");
         for wav in wavs {
-            self.resource_manager.load_wav(wav.to_string(), self.resource_send.clone());
+            self.resource_manager
+                .load_wav(wav.to_string(), self.resource_send.clone());
             self.loading_files.insert(wav.to_string());
         }
     }
@@ -91,8 +87,8 @@ impl AudioManager {
                 match res {
                     Ok(w) => {
                         new_wavs.push((file, w));
-                    },
-                    Err(e) => error!(err=e.to_string(), "Failed to load wav"),
+                    }
+                    Err(e) => error!(err = e.to_string(), "Failed to load wav"),
                 }
             }
             if new_wavs.len() != 0 {

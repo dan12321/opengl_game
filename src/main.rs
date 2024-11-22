@@ -4,10 +4,10 @@ mod config;
 mod controller;
 mod physics;
 mod render;
+mod resource;
 mod shader;
 mod shape;
 mod state;
-mod resource;
 
 extern crate glfw;
 extern crate image;

@@ -1,6 +1,6 @@
 use std::sync::mpsc::Receiver;
-use std::thread;
 use std::sync::mpsc::{self, Sender};
+use std::thread;
 
 use anyhow::Result;
 
@@ -33,23 +33,33 @@ impl ResourceManager {
     // Note: might be a spot for generics, just trait "from_file". Maybe proc_macro
     // if that doesn't work due to needing an enum type for the channel.
     pub fn load_wav(&self, file: String, callback_sender: DataResSender<Wav>) {
-        self.req_sender.send(DataReq::Wav((file, callback_sender))).unwrap();
+        self.req_sender
+            .send(DataReq::Wav((file, callback_sender)))
+            .unwrap();
     }
 
     pub fn load_map(&self, file: String, callback_sender: DataResSender<Map>) {
-        self.req_sender.send(DataReq::Map((file, callback_sender))).unwrap();
+        self.req_sender
+            .send(DataReq::Map((file, callback_sender)))
+            .unwrap();
     }
 
     pub fn load_model(&self, file: String, callback_sender: DataResSender<Model>) {
-        self.req_sender.send(DataReq::Model((file, callback_sender))).unwrap();
+        self.req_sender
+            .send(DataReq::Model((file, callback_sender)))
+            .unwrap();
     }
 
     pub fn load_material(&self, file: String, callback_sender: DataResSender<Vec<Material>>) {
-        self.req_sender.send(DataReq::Material((file, callback_sender))).unwrap();
+        self.req_sender
+            .send(DataReq::Material((file, callback_sender)))
+            .unwrap();
     }
 
     pub fn load_texture(&self, file: String, callback_sender: DataResSender<Texture>) {
-        self.req_sender.send(DataReq::Texture((file, callback_sender))).unwrap();
+        self.req_sender
+            .send(DataReq::Texture((file, callback_sender)))
+            .unwrap();
     }
 }
 
@@ -65,19 +75,19 @@ fn run_io(rec: Receiver<DataReq>, shutdown: Receiver<()>) {
         match req {
             DataReq::Wav((s, send)) => {
                 load::<Wav>(AUDIO_LOCATION, s, send);
-            },
+            }
             DataReq::Map((s, send)) => {
                 load::<Map>(MAP_LOCATION, s, send);
-            },
+            }
             DataReq::Model((s, send)) => {
                 load::<Model>(MODEL_LOCATION, s, send);
-            },
+            }
             DataReq::Material((s, send)) => {
                 load::<Material>("", s, send);
-            },
+            }
             DataReq::Texture((s, send)) => {
                 load::<Texture>("", s, send);
-            },
+            }
         };
     }
 }
@@ -101,7 +111,11 @@ pub trait Loadable {
     fn load(path: &str) -> Result<Self::Output>;
 }
 
-fn load<T: Loadable>(resource_location: &str, resource_name: String, sender: DataResSender<T::Output>) {
+fn load<T: Loadable>(
+    resource_location: &str,
+    resource_name: String,
+    sender: DataResSender<T::Output>,
+) {
     let path: String = resource_location.to_string() + &resource_name;
     let resource: Result<T::Output> = T::load(&path);
     sender.send((resource_name, resource)).unwrap();
@@ -110,3 +124,4 @@ fn load<T: Loadable>(resource_location: &str, resource_name: String, sender: Dat
 const AUDIO_LOCATION: &'static str = "assets/sounds/";
 const MAP_LOCATION: &'static str = "assets/maps/";
 const MODEL_LOCATION: &'static str = "assets/models/";
+

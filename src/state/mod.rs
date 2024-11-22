@@ -10,15 +10,11 @@ use crate::audio::{AudioAction, AudioManager};
 use crate::camera::Camera;
 use crate::config::{self, BEAT_SIZE, COLUMN_WIDTH, PLANE_LENGTH, PLANE_WIDTH};
 use crate::controller::{Button, Controller};
-use crate::render::Renderer;
-use crate::resource::{
-    manager::ResourceManager,
-    map::Map,
-};
-use crate::shader;
 use crate::physics::AABBColider;
+use crate::render::Renderer;
+use crate::resource::{manager::ResourceManager, map::Map};
+use crate::shader;
 use crate::shader::DirLight;
-
 
 pub struct Game {
     audio_manager: AudioManager,
@@ -59,27 +55,18 @@ impl Game {
             map_loading: None,
             renderer,
             scene_resources: None,
-            maps: vec![
-                SAD_MAP.to_string(),
-                UPBEAT_MAP.to_string(),
-            ],
+            maps: vec![SAD_MAP.to_string(), UPBEAT_MAP.to_string()],
             progress: 0.0,
         }
     }
 
-    pub fn update(
-        mut self,
-        delta_time: Duration,
-        controller: &Controller,
-    ) -> Self {
+    pub fn update(mut self, delta_time: Duration, controller: &Controller) -> Self {
         self.status = match self.status {
             Status::Load(map) => self.load_map(map),
             Status::Loading => self.loading_update(),
-            Status::Play(scene) => {
-                match scene.player_state {
-                    PlayerStatus::Alive => scene.alive_update(delta_time, controller),
-                    PlayerStatus::Dead => scene.dead_update(delta_time, controller),
-                }
+            Status::Play(scene) => match scene.player_state {
+                PlayerStatus::Alive => scene.alive_update(delta_time, controller),
+                PlayerStatus::Dead => scene.dead_update(delta_time, controller),
             },
             Status::Paused(scene) => scene.pause_update(controller),
             Status::Resetting(scene) => scene.resetting_update(),
@@ -89,7 +76,8 @@ impl Game {
     }
 
     fn load_map(&mut self, map: usize) -> Status {
-        self.resource_manager.load_map(self.maps[map].clone(), self.map_sender.clone());
+        self.resource_manager
+            .load_map(self.maps[map].clone(), self.map_sender.clone());
         self.progress = 0.0;
         Status::Loading
     }
@@ -141,7 +129,7 @@ impl Game {
             self.progress += 0.00001;
         }
 
-        if !self.renderer.loaded_check()  {
+        if !self.renderer.loaded_check() {
             return Status::Loading;
         }
 
@@ -161,10 +149,7 @@ impl Game {
 
         let audio_sender = self.audio_manager.get_sender();
 
-        let scene = SceneState::new(
-            self.map_loading.take().unwrap(),
-            audio_sender,
-        );
+        let scene = SceneState::new(self.map_loading.take().unwrap(), audio_sender);
         scene.play()
     }
 }
@@ -184,10 +169,7 @@ pub struct SceneState {
 }
 
 impl SceneState {
-    pub fn new(
-        map: Map,
-        audio_sender: Sender<AudioAction>,
-    ) -> Self {
+    pub fn new(map: Map, audio_sender: Sender<AudioAction>) -> Self {
         let camera = Camera::new(8.0, 0.0, -0.82, vector![0.0, 0.0, 0.0]);
 
         let cubes = Self::starting_cubes(&map);
@@ -197,13 +179,11 @@ impl SceneState {
             camera,
             cubes,
             point_lights: lights,
-            dir_lights: vec![
-                DirLight {
-                    direction: (0.0, -0.95, 0.34),
-                    diffuse: (0.75, 0.95, 1.0),
-                    specular: (0.6, 0.6, 0.6),
-                }
-            ],
+            dir_lights: vec![DirLight {
+                direction: (0.0, -0.95, 0.34),
+                diffuse: (0.75, 0.95, 1.0),
+                specular: (0.6, 0.6, 0.6),
+            }],
             player: Player {
                 target_lane: 1,
                 current_lane: 1,
@@ -243,8 +223,8 @@ impl SceneState {
                             rotation: Matrix4::identity(),
                         },
                         model: PLANE_MODEL.to_string(),
-                    }
-                ]
+                    },
+                ],
             },
             map,
             player_state: PlayerStatus::Alive,
@@ -496,16 +476,16 @@ impl SceneState {
     fn play(self) -> Status {
         let action = match self.player_state {
             PlayerStatus::Alive => AudioAction::Play(self.map.music.clone()),
-            PlayerStatus::Dead => {
-                AudioAction::Slow(self.map.music.clone())
-            },
+            PlayerStatus::Dead => AudioAction::Slow(self.map.music.clone()),
         };
         self.audio_sender.send(action).unwrap();
         Status::Play(self)
     }
 
     fn death(self) -> Status {
-        self.audio_sender.send(AudioAction::Play(DEATH_TRACK.to_string())).unwrap();
+        self.audio_sender
+            .send(AudioAction::Play(DEATH_TRACK.to_string()))
+            .unwrap();
         let action = AudioAction::Slow(self.map.music.clone());
         self.audio_sender.send(action).unwrap();
         Status::Play(self)
@@ -654,7 +634,7 @@ impl Status {
 #[derive(Debug)]
 pub enum PlayerStatus {
     Alive,
-    Dead
+    Dead,
 }
 
 struct SceneResources {
@@ -667,3 +647,4 @@ const UPBEAT_MAP: &'static str = "upbeat.txt";
 const CUBE_MODEL: &'static str = "cube/cube.obj";
 const PLANE_MODEL: &'static str = "plane/plane.obj";
 const BACKPACK_MODEL: &'static str = "backpack/backpack.obj";
+

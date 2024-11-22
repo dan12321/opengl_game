@@ -43,27 +43,27 @@ impl<'a> Controller<'a> {
             match event {
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     buttons.push(Button::Quit);
-                },
+                }
                 WindowEvent::Key(Key::Num1, _, Action::Press, _) => {
                     buttons.push(Button::Level(0));
-                },
+                }
                 WindowEvent::Key(Key::Num2, _, Action::Press, _) => {
                     buttons.push(Button::Level(1));
-                },
+                }
                 WindowEvent::Key(Key::R, _, Action::Press, _) => {
                     buttons.push(Button::Restart);
-                },
+                }
                 WindowEvent::Key(Key::P, _, Action::Press, _) => {
                     buttons.push(Button::Pause);
-                },
+                }
                 WindowEvent::Key(Key::Right, _, Action::Press, _) => {
                     self.direction_x = 1.0;
                     x_set = true;
-                },
+                }
                 WindowEvent::Key(Key::Left, _, Action::Press, _) => {
                     self.direction_x = -1.0;
                     x_set = true;
-                },
+                }
                 WindowEvent::CursorPos(x, y) => {
                     let x = x as f32 / config::CURSOR_MOVEMENT_SCALE;
                     let y = y as f32 / config::CURSOR_MOVEMENT_SCALE;
@@ -79,8 +79,9 @@ impl<'a> Controller<'a> {
                     self.camera_y = cy_clamped;
                     window.set_cursor_pos(
                         (x * config::CURSOR_MOVEMENT_SCALE) as f64,
-                        (cy_clamped * config::CURSOR_MOVEMENT_SCALE) as f64);
-                },
+                        (cy_clamped * config::CURSOR_MOVEMENT_SCALE) as f64,
+                    );
+                }
                 WindowEvent::Scroll(_, y) => {
                     let zoom = self.zoom - (y as f32 * SCROLL_ZOOM_SCALE);
                     let clamp_min = if zoom > MIN_ZOOM { zoom } else { MIN_ZOOM };
@@ -90,7 +91,7 @@ impl<'a> Controller<'a> {
                         MAX_ZOOM
                     };
                     self.zoom = clamp as f32;
-                },
+                }
                 _ => (),
             }
         }
