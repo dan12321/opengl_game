@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, RwLock};
-use std::thread;
+use std::thread::{self, JoinHandle};
 
 use anyhow::Result;
 use cpal::SupportedStreamConfigRange;
@@ -25,6 +25,7 @@ pub struct AudioManager {
     resource_send: Sender<(String, Result<Wav>)>,
     loading_files: HashSet<String>,
     loaded_files: HashSet<String>,
+    audio_thread: JoinHandle<()>,
 }
 
 impl AudioManager {
@@ -49,7 +50,7 @@ impl AudioManager {
         let wavs = Arc::new(RwLock::new(HashMap::new()));
         let audio_thread_wavs = wavs.clone();
 
-        thread::spawn(move || {
+        let audio_thread = thread::spawn(move || {
             let mut audio_thread = Mixer::new(receiver, device, config.into(), audio_thread_wavs);
             audio_thread.run();
         });
@@ -66,6 +67,7 @@ impl AudioManager {
             resource_send,
             loading_files,
             loaded_files,
+            audio_thread,
         }
     }
 
@@ -76,6 +78,13 @@ impl AudioManager {
                 .load_wav(wav.to_string(), self.resource_send.clone());
             self.loading_files.insert(wav.to_string());
         }
+    }
+
+    pub fn unload_wav(&mut self, wav: &str) {
+        self.sender.send(AudioAction::Cleanup(wav.to_string())).unwrap();
+        self.loaded_files.remove(wav);
+        // This may happen before the track is cleaned up
+        self.wavs.write().unwrap().remove(wav);
     }
 
     pub fn loaded_check(&mut self) -> bool {
@@ -109,11 +118,9 @@ impl AudioManager {
     pub fn get_sender(&self) -> Sender<AudioAction> {
         self.sender.clone()
     }
-}
 
-impl Drop for AudioManager {
-    fn drop(&mut self) {
-        self.sender.send(AudioAction::Cleanup).unwrap();
+    pub fn cleanup(&self) {
+        self.sender.send(AudioAction::ShutdownThread).unwrap();
     }
 }
 
@@ -187,7 +194,7 @@ impl Mixer {
         stream.play().unwrap();
 
         let mut last_message = self.receiver.recv().unwrap();
-        while last_message != AudioAction::Cleanup {
+        while last_message != AudioAction::ShutdownThread {
             debug!(
                 last_message = format!("{:?}", last_message),
                 "last audio message"
@@ -265,7 +272,8 @@ pub enum AudioAction {
     Stop(String),
     Reset(String),
     Slow(String),
-    Cleanup,
+    Cleanup(String),
+    ShutdownThread,
 }
 
 struct Track {
@@ -327,6 +335,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) 
                 );
             }
         },
-        AudioAction::Cleanup => (),
+        AudioAction::Cleanup(track) => { tracks.remove(&track); },
+        AudioAction::ShutdownThread => (),
     }
 }

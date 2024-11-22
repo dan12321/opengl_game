@@ -1,6 +1,6 @@
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::{self, Sender};
-use std::thread;
+use std::thread::{self, JoinHandle};
 
 use anyhow::Result;
 
@@ -11,22 +11,22 @@ use super::model::{Material, Model, Texture};
 #[derive(Debug)]
 pub struct ResourceManager {
     req_sender: Sender<DataReq>,
-    // shutdown_sender: Sender<()>,
-    // io_thread: JoinHandle<()>,
+    shutdown_sender: Sender<()>,
+    io_thread: Option<JoinHandle<()>>,
 }
 
 impl ResourceManager {
     pub fn new() -> Self {
         let (req_sender, req_receiver) = mpsc::channel::<DataReq>();
-        let (_shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
-        let _io_thread = thread::spawn(move || {
+        let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
+        let io_thread = thread::spawn(move || {
             run_io(req_receiver, shutdown_receiver);
         });
 
         Self {
             req_sender,
-            // shutdown_sender,
-            // io_thread,
+            shutdown_sender,
+            io_thread: Some(io_thread),
         }
     }
 
@@ -60,6 +60,13 @@ impl ResourceManager {
         self.req_sender
             .send(DataReq::Texture((file, callback_sender)))
             .unwrap();
+    }
+
+    pub fn cleanup(&self) {
+        // TODO: wait for join. Because this is behind an Arc we can't take ownership
+        // of self here. Adding in drop would work but it would be good to keep the
+        // shutdown order explicit with resource manager at the end
+        self.shutdown_sender.send(());
     }
 }
 

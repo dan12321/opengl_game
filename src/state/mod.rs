@@ -63,7 +63,14 @@ impl Game {
         }
     }
 
-    pub fn update(mut self, delta_time: Duration, controller: &Controller) -> Self {
+    pub fn update(mut self, delta_time: Duration, controller: &Controller, window: &mut glfw::Window) -> Self {
+        if controller.buttons().contains(&Button::Quit) {
+            // These should "take" the resource but can't with how this is written.
+            self.audio_manager.cleanup();
+            self.resource_manager.cleanup();
+            window.set_should_close(true);
+            return self;
+        }
         self.status = match self.status {
             Status::Load(map) => self.load_map(map),
             Status::Loading => self.loading_update(),
@@ -79,6 +86,14 @@ impl Game {
     }
 
     fn load_map(&mut self, map: usize) -> Status {
+        // Clean up resources
+        if let Some(mut scene_resources) = self.scene_resources.take() {
+            if let Some(music) = scene_resources.music.take() {
+                self.audio_manager.unload_wav(&music);
+            }
+        }
+
+        // Initialise loading of new resources
         self.resource_manager
             .load_map(self.maps[map].clone(), self.map_sender.clone());
         self.progress = 0.0;

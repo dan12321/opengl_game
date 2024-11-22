@@ -83,6 +83,6 @@ fn main() {
             }
         }
 
-        game = game.update(delta_time, &controller);
+        game = game.update(delta_time, &controller, &mut window);
     }
 }
