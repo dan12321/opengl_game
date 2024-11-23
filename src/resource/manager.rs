@@ -66,7 +66,7 @@ impl ResourceManager {
         // TODO: wait for join. Because this is behind an Arc we can't take ownership
         // of self here. Adding in drop would work but it would be good to keep the
         // shutdown order explicit with resource manager at the end
-        self.shutdown_sender.send(());
+        self.shutdown_sender.send(()).unwrap();
     }
 }
 

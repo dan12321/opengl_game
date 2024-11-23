@@ -99,7 +99,7 @@ impl ProgressRenderer {
         }
     }
 
-    pub fn draw(&self, bar: &ProgressBar) {
+    pub fn draw(&self, bar: ProgressBar) {
         unsafe {
             gl::UseProgram(self.shader_id);
             gl::BindVertexArray(self.vao);

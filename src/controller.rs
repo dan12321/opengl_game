@@ -4,13 +4,13 @@ use super::config;
 use super::config::{MAX_ZOOM, MIN_ZOOM, SCROLL_ZOOM_SCALE};
 use glfw::{Action, Glfw, Key, Window, WindowEvent};
 
-pub struct Controller<'a> {
+pub struct Controller {
     direction_x: f32,
     camera_x: f32,
     camera_y: f32,
     zoom: f32,
     buttons_down: Vec<Button>,
-    glfw: &'a mut Glfw,
+    glfw: Glfw,
     events: Receiver<(f64, WindowEvent)>,
 }
 
@@ -22,8 +22,8 @@ pub enum Button {
     Level(usize),
 }
 
-impl<'a> Controller<'a> {
-    pub fn new(glfw: &'a mut Glfw, events: Receiver<(f64, WindowEvent)>) -> Self {
+impl Controller {
+    pub fn new(glfw: Glfw, events: Receiver<(f64, WindowEvent)>) -> Self {
         Controller {
             direction_x: 0.0,
             camera_x: 0.0,

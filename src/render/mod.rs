@@ -13,7 +13,7 @@ use model_renderer::ModelRenderer;
 use na::Perspective3;
 use point_light_renderer::PointLightRenderer;
 use progress_renderer::ProgressRenderer;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::config::{PROGRESS_FRAG_SHADER, PROGRESS_VERT_SHADER};
 use crate::resource::manager::{DataResRec, DataResSender, ResourceManager};
@@ -29,7 +29,6 @@ pub struct Renderer {
     light: PointLightRenderer,
     model: ModelRenderer,
     progress: ProgressRenderer,
-    projection: Perspective3<GLfloat>,
     resource_manager: Arc<ResourceManager>,
     loading_models: HashSet<String>,
     models: HashMap<String, Vec<String>>,
@@ -48,19 +47,11 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(
-        window_width: u32,
-        window_height: u32,
         resource_manager: Arc<ResourceManager>,
     ) -> Self {
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
         }
-        let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
-        let fovy: GLfloat = PI / 2.0;
-        let znear: GLfloat = 0.1;
-        let zfar: GLfloat = 100.0;
-        let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
-
         let light_vert_shader = PathBuf::from(LIGHT_VERT_SHADER);
         let light_frag_shader = PathBuf::from(LIGHT_FRAG_SHADER);
         let light = PointLightRenderer::new(
@@ -94,7 +85,6 @@ impl Renderer {
             light,
             model,
             progress,
-            projection,
             resource_manager,
             loading_models: HashSet::new(),
             models: HashMap::new(),
@@ -112,9 +102,15 @@ impl Renderer {
         }
     }
 
-    pub fn update(&self, state: Option<&SceneState>, progress: Option<&ProgressBar>) {
+    pub fn update(
+        &self,
+        state: Option<&SceneState>,
+        progress: Option<ProgressBar>,
+        window_width: i32,
+        window_height: i32,
+    ) {
         if let Some(s) = state {
-            self.render(s);
+            self.render(s, window_width, window_height);
         } else if let Some(p) = progress {
             self.render_loading(p);
         }
@@ -154,6 +150,7 @@ impl Renderer {
     }
 
     pub fn loaded_check(&mut self) -> (usize, usize) {
+        debug!("Render loaded check");
         // Models
         if !self.loading_models.is_empty() {
             while let Ok((model_name, res)) = self.model_rec.try_recv() {
@@ -235,8 +232,19 @@ impl Renderer {
         (loading_assets, loaded_assets)
     }
 
-    fn render(&self, state: &SceneState) {
+    fn render(
+        &self,
+        state: &SceneState,
+        window_width: i32,
+        window_height: i32,
+    ) {
         clear();
+        let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
+        let fovy: GLfloat = PI / 2.0;
+        let znear: GLfloat = 0.1;
+        let zfar: GLfloat = 100.0;
+        let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
+
         let view = state.camera.transform();
         let light_uniforms: Vec<PointLight> = state
             .point_lights
@@ -246,7 +254,7 @@ impl Renderer {
         self.light.draw(
             &state.point_lights,
             view,
-            self.projection.as_matrix().clone(),
+            projection.as_matrix().clone(),
         );
 
         self.model.draw(
@@ -260,13 +268,13 @@ impl Renderer {
             &state.dir_lights,
             &state.camera.position().into(),
             view,
-            self.projection.as_matrix().clone(),
+            projection.as_matrix().clone(),
             &self.models,
             &self.materials,
         );
     }
 
-    fn render_loading(&self, progress: &ProgressBar) {
+    fn render_loading(&self, progress: ProgressBar) {
         clear();
         self.progress.draw(progress);
     }

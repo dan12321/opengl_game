@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use glfw::{Context, Window};
 use na::{vector, Matrix4};
 use tracing::debug;
 
@@ -23,32 +24,62 @@ pub struct Game {
     audio_manager: AudioManager,
     renderer: Renderer,
     resource_manager: Arc<ResourceManager>,
+    controller: Controller,
     map_loading: Option<Map>,
     progress: f32,
     scene_resources: Option<SceneResources>,
     map_sender: Sender<(String, Result<Map>)>,
     map_receiver: Receiver<(String, Result<Map>)>,
     maps: Vec<String>,
-    status: Status,
+    pub status: Status,
+    window: Window,
 }
 
 impl Game {
-    pub fn new(window_width: u32, window_height: u32) -> Self {
+    pub fn new() -> Self {
+        // Window Setup
+        let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+        glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
+        glfw.window_hint(glfw::WindowHint::OpenGlProfile(
+            glfw::OpenGlProfileHint::Core,
+        ));
+        let window_width = 900;
+        let window_height = 900;
+        let (mut window, window_events) = glfw
+            .create_window(
+                window_width,
+                window_height,
+                "Hello Window",
+                glfw::WindowMode::Windowed,
+            )
+            .expect("Failed to create GLFW window.");
+
+        window.make_current();
+        window.set_resizable(false);
+        window.set_key_polling(true);
+        window.set_cursor_pos_polling(true);
+        window.set_cursor_mode(glfw::CursorMode::Disabled);
+        window.set_raw_mouse_motion(true);
+        window.set_scroll_polling(true);
+
+        // OpenGL Setup
+        gl::load_with(|s| window.get_proc_address(s));
+
         // Setup managers
+        let controller = Controller::new(glfw, window_events);
         let resource_manager = Arc::new(ResourceManager::new());
-        let audio_manager = AudioManager::new(resource_manager.clone());
-        let mut renderer = Renderer::new(window_width, window_height, resource_manager.clone());
+        let mut audio_manager = AudioManager::new(resource_manager.clone());
+        let mut renderer = Renderer::new(resource_manager.clone());
 
         let (map_sender, map_receiver) = mpsc::channel();
-        let status = Status::Loading;
-
-        // Start loading initial level
-        resource_manager.load_map(SAD_MAP.to_string(), map_sender.clone());
+        let status = Status::Load(0);
+        // Start loading base resources
         renderer.load_models(vec![
             CUBE_MODEL.to_string(),
             PLANE_MODEL.to_string(),
             BACKPACK_MODEL.to_string(),
         ]);
+        audio_manager.load_wavs(&[DEATH_TRACK]);
         Self {
             audio_manager,
             resource_manager,
@@ -60,59 +91,56 @@ impl Game {
             scene_resources: None,
             maps: vec![SAD_MAP.to_string(), UPBEAT_MAP.to_string()],
             progress: 0.0,
+            window,
+            controller,
         }
     }
 
-    pub fn update(mut self, delta_time: Duration, controller: &Controller, window: &mut glfw::Window) -> Self {
-        if controller.buttons().contains(&Button::Quit) {
+    pub fn update(mut self, delta_time: Duration) -> Self {
+        // Process Inputs
+        self.controller.poll_input(&mut self.window);
+
+        // Game Logic
+        if self.controller.buttons().contains(&Button::Quit) {
             // These should "take" the resource but can't with how this is written.
             self.audio_manager.cleanup();
             self.resource_manager.cleanup();
-            window.set_should_close(true);
-            return self;
+            self.window.set_should_close(true);
+            self.status = Status::Ended;
         }
+        let mut progress_bar = None;
         self.status = match self.status {
             Status::Load(map) => self.load_map(map),
-            Status::Loading => self.loading_update(),
-            Status::Play(scene) => match scene.player_state {
-                PlayerStatus::Alive => scene.alive_update(delta_time, controller),
-                PlayerStatus::Dead => scene.dead_update(delta_time, controller),
+            Status::Loading => {
+                progress_bar = Some(ProgressBar {
+                    transform: Transform {
+                        position: (-0.5, -0.5, 0.0).into(),
+                        scale: (1.0, 0.2, 1.0).into(),
+                        rotation: Matrix4::identity(),
+                    },
+                    base_color: (0.0, 0.3, 0.7),
+                    progress_color: (0.0, 0.7, 1.0),
+                    progress: f32::min(self.progress, 1.0),
+                });
+                self.loading_update()
             },
-            Status::Paused(scene) => scene.pause_update(controller),
+            Status::Play(scene) => match scene.player_state {
+                PlayerStatus::Alive => scene.alive_update(delta_time, &self.controller),
+                PlayerStatus::Dead => scene.dead_update(delta_time, &self.controller),
+            },
+            Status::Paused(scene) => scene.pause_update(&self.controller),
             Status::Resetting(scene) => scene.resetting_update(),
+            Status::Ended => return self,
         };
-        self.renderer.update(self.status.get_state(), None);
+
+        // Render
+        let (width, height) = self.window.get_size();
+        self.renderer.update(self.status.get_state(), progress_bar, width, height);
+        self.window.swap_buffers();
         self
     }
 
-    fn load_map(&mut self, map: usize) -> Status {
-        // Clean up resources
-        if let Some(mut scene_resources) = self.scene_resources.take() {
-            if let Some(music) = scene_resources.music.take() {
-                self.audio_manager.unload_wav(&music);
-            }
-        }
-
-        // Initialise loading of new resources
-        self.resource_manager
-            .load_map(self.maps[map].clone(), self.map_sender.clone());
-        self.progress = 0.0;
-        Status::Loading
-    }
-
     fn loading_update(&mut self) -> Status {
-        let progress = ProgressBar {
-            transform: Transform {
-                position: (-0.5, -0.5, 0.0).into(),
-                scale: (1.0, 0.2, 1.0).into(),
-                rotation: Matrix4::identity(),
-            },
-            base_color: (0.0, 0.3, 0.7),
-            progress_color: (0.0, 0.7, 1.0),
-            progress: f32::min(self.progress, 1.0),
-        };
-        self.renderer.update(None, Some(&progress));
-
         if self.progress < 0.1 {
             self.progress += 0.0001;
         }
@@ -122,7 +150,7 @@ impl Game {
             };
             let map = map.unwrap();
             // TODO: Move death_track to BaseLoading stage
-            let wavs = [DEATH_TRACK, map.music.as_str()];
+            let wavs = [map.music.as_str()];
             self.audio_manager.load_wavs(&wavs);
             self.map_loading = Some(map);
             debug!("Map Loaded");
@@ -155,6 +183,22 @@ impl Game {
         let scene = SceneState::new(self.map_loading.take().unwrap(), audio_sender);
         scene.play()
     }
+
+    fn load_map(&mut self, map: usize) -> Status {
+        // Clean up resources
+        if let Some(mut scene_resources) = self.scene_resources.take() {
+            if let Some(music) = scene_resources.music.take() {
+                self.audio_manager.unload_wav(&music);
+            }
+        }
+
+        // Initialise loading of new resources
+        self.resource_manager
+            .load_map(self.maps[map].clone(), self.map_sender.clone());
+        self.progress = 0.0;
+        Status::Loading
+    }
+
 }
 
 #[derive(Debug)]
@@ -622,6 +666,7 @@ pub enum Status {
     // is a sign that how updates is handled needs refactoring.
     Load(usize),
     Loading,
+    Ended,
 }
 
 impl Status {
@@ -630,6 +675,14 @@ impl Status {
             Self::Play(s) | Self::Resetting(s) | Self::Paused(s) => Some(s),
             Self::Loading => None,
             Self::Load(_) => None,
+            Self::Ended => None,
+        }
+    }
+
+    pub fn ended(&self) -> bool {
+        match self {
+            Self::Ended => true,
+            _ => false,
         }
     }
 }
