@@ -17,7 +17,7 @@ use crate::{
         create_shader, template_dir_light, template_point_light, DirLight, DirLightProp,
         OpenGLError, PointLight, PointLightProp,
     },
-    state::{GameObject, XYZ},
+    state::scenes::{GameObject, XYZ},
 };
 
 use crate::resource::model::{Material, Mesh};

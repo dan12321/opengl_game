@@ -5,22 +5,24 @@ mod progress_renderer;
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::PI;
 use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
 use std::sync::{mpsc, Arc};
 
 use gl;
 use gl::types::*;
+use glfw::Window;
 use model_renderer::ModelRenderer;
 use na::Perspective3;
 use point_light_renderer::PointLightRenderer;
 use progress_renderer::ProgressRenderer;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::config::{PROGRESS_FRAG_SHADER, PROGRESS_VERT_SHADER};
 use crate::resource::manager::{DataResRec, DataResSender, ResourceManager};
 use crate::resource::model::{Material, Model, Texture};
 use crate::shader::PointLight;
 use crate::shape::{QUAD_INDICES, QUAD_VERTICES};
-use crate::state::{ProgressBar, SceneState};
+use crate::state::scenes::SceneManager;
 
 use super::config::{LIGHT_FRAG_SHADER, LIGHT_VERT_SHADER, MODEL_VERT_SHADER, TEXTURE_FRAG_SHADER};
 use super::shape::{CUBE_INDICES, CUBE_VERTICES};
@@ -30,6 +32,7 @@ pub struct Renderer {
     model: ModelRenderer,
     progress: ProgressRenderer,
     resource_manager: Arc<ResourceManager>,
+    message_rec: Receiver<RenderMessage>,
     loading_models: HashSet<String>,
     models: HashMap<String, Vec<String>>,
     model_sender: DataResSender<Model>,
@@ -46,9 +49,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(
-        resource_manager: Arc<ResourceManager>,
-    ) -> Self {
+    pub fn new(resource_manager: Arc<ResourceManager>, message_rec: Receiver<RenderMessage>) -> Self {
         unsafe {
             gl::Enable(gl::DEPTH_TEST);
         }
@@ -86,6 +87,7 @@ impl Renderer {
             model,
             progress,
             resource_manager,
+            message_rec,
             loading_models: HashSet::new(),
             models: HashMap::new(),
             loading_material_files: HashSet::new(),
@@ -102,29 +104,13 @@ impl Renderer {
         }
     }
 
-    pub fn update(
-        &self,
-        state: Option<&SceneState>,
-        progress: Option<ProgressBar>,
-        window_width: i32,
-        window_height: i32,
-    ) {
-        if let Some(s) = state {
-            self.render(s, window_width, window_height);
-        } else if let Some(p) = progress {
-            self.render_loading(p);
+    pub fn load_model(&mut self, model: String) {
+        if self.loading_models.contains(&model) || self.models.contains_key(&model) {
+            return;
         }
-    }
-
-    pub fn load_models(&mut self, models: Vec<String>) {
-        for model in models {
-            if self.loading_models.contains(&model) || self.models.contains_key(&model) {
-                continue;
-            }
-            self.resource_manager
-                .load_model(model.clone(), self.model_sender.clone());
-            self.loading_models.insert(model);
-        }
+        self.resource_manager
+            .load_model(model.clone(), self.model_sender.clone());
+        self.loading_models.insert(model);
     }
 
     pub fn load_materials(&mut self, materials: Vec<String>) {
@@ -149,8 +135,71 @@ impl Renderer {
         }
     }
 
-    pub fn loaded_check(&mut self) -> (usize, usize) {
-        debug!("Render loaded check");
+    pub fn loaded_check(&self) -> (usize, usize) {
+        let loaded_assets = self.models.len() + self.materials.len() + self.textures.len();
+        let loading_assets = self.loading_models.len()
+            + self.loading_material_files.len()
+            + self.loading_textures.len();
+        (loading_assets, loaded_assets)
+    }
+
+    pub fn update(&mut self, window: &Window, scene_manager: &SceneManager) {
+        // Check Messages
+        while let Ok(message) = self.message_rec.try_recv() {
+            match message {
+                RenderMessage::Load(s) => self.load_model(s),
+                RenderMessage::Unload(_) => (),
+            }
+        }
+        // Check loading
+        self.loading_update();
+
+        // Render
+        self.render(window, scene_manager);
+    }
+
+    fn render(&self, window: &Window, scene_manager: &SceneManager) {
+        clear();
+        let (window_width, window_height) = window.get_size();
+        let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
+        let fovy: GLfloat = PI / 2.0;
+        let znear: GLfloat = 0.1;
+        let zfar: GLfloat = 100.0;
+        let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
+
+        if let Some(state) = scene_manager.get_level_state() {
+            let view = state.camera.transform();
+            let light_uniforms: Vec<PointLight> = state
+                .point_lights
+                .iter()
+                .map(|l| l.as_light_uniforms())
+                .collect();
+            self.light
+                .draw(&state.point_lights, view, projection.as_matrix().clone());
+
+            self.model.draw(
+                &[
+                    &state.cubes[..],
+                    &[state.player.model.clone()],
+                    state.plane.models.as_slice(),
+                ]
+                .concat(),
+                &light_uniforms,
+                &state.dir_lights,
+                &state.camera.position().into(),
+                view,
+                projection.as_matrix().clone(),
+                &self.models,
+                &self.materials,
+            );
+        }
+
+        if let Some(progress) = scene_manager.get_progress_bar() {
+            self.progress.draw(progress);
+        }
+    }
+
+    fn loading_update(&mut self) {
         // Models
         if !self.loading_models.is_empty() {
             while let Ok((model_name, res)) = self.model_rec.try_recv() {
@@ -226,57 +275,6 @@ impl Renderer {
                 };
             }
         }
-
-        let loaded_assets = self.models.len() + self.materials.len() + self.textures.len();
-        let loading_assets = self.loading_models.len() + self.loading_material_files.len() + self.loading_textures.len();
-        (loading_assets, loaded_assets)
-    }
-
-    fn render(
-        &self,
-        state: &SceneState,
-        window_width: i32,
-        window_height: i32,
-    ) {
-        clear();
-        let aspect_ratio: GLfloat = window_width as GLfloat / window_height as GLfloat;
-        let fovy: GLfloat = PI / 2.0;
-        let znear: GLfloat = 0.1;
-        let zfar: GLfloat = 100.0;
-        let projection: Perspective3<GLfloat> = Perspective3::new(aspect_ratio, fovy, znear, zfar);
-
-        let view = state.camera.transform();
-        let light_uniforms: Vec<PointLight> = state
-            .point_lights
-            .iter()
-            .map(|l| l.as_light_uniforms())
-            .collect();
-        self.light.draw(
-            &state.point_lights,
-            view,
-            projection.as_matrix().clone(),
-        );
-
-        self.model.draw(
-            &[
-                &state.cubes[..],
-                &[state.player.model.clone()],
-                state.plane.models.as_slice(),
-            ]
-            .concat(),
-            &light_uniforms,
-            &state.dir_lights,
-            &state.camera.position().into(),
-            view,
-            projection.as_matrix().clone(),
-            &self.models,
-            &self.materials,
-        );
-    }
-
-    fn render_loading(&self, progress: ProgressBar) {
-        clear();
-        self.progress.draw(progress);
     }
 }
 
@@ -285,4 +283,9 @@ fn clear() {
         gl::ClearColor(0.0, 0.0, 0.0, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
     }
+}
+
+pub enum RenderMessage {
+    Load(String),
+    Unload(String),
 }

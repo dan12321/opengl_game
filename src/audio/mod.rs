@@ -18,18 +18,19 @@ use super::resource::audio::Wav;
 
 #[derive(Debug)]
 pub struct AudioManager {
-    sender: Sender<AudioAction>,
+    mixer_sender: Sender<TrackAction>,
     wavs: Arc<RwLock<HashMap<String, Wav>>>,
     resource_manager: Arc<ResourceManager>,
     resource_rec: Receiver<(String, Result<Wav>)>,
     resource_send: Sender<(String, Result<Wav>)>,
+    message_rec: Receiver<AudioMessage>,
     loading_files: HashSet<String>,
     loaded_files: HashSet<String>,
     audio_thread: JoinHandle<()>,
 }
 
 impl AudioManager {
-    pub fn new(resource_manager: Arc<ResourceManager>) -> Self {
+    pub fn new(resource_manager: Arc<ResourceManager>, message_rec: Receiver<AudioMessage>) -> Self {
         let host = cpal::default_host();
         let device = host.default_output_device().unwrap();
         let device_name = device.name().unwrap();
@@ -46,7 +47,7 @@ impl AudioManager {
             config = format!("{:?}", &config),
             "Output device"
         );
-        let (sender, receiver) = mpsc::channel::<AudioAction>();
+        let (sender, receiver) = mpsc::channel::<TrackAction>();
         let wavs = Arc::new(RwLock::new(HashMap::new()));
         let audio_thread_wavs = wavs.clone();
 
@@ -60,7 +61,7 @@ impl AudioManager {
         let loaded_files = std::collections::HashSet::new();
 
         AudioManager {
-            sender,
+            mixer_sender: sender,
             wavs,
             resource_manager,
             resource_rec,
@@ -68,26 +69,21 @@ impl AudioManager {
             loading_files,
             loaded_files,
             audio_thread,
+            message_rec,
         }
     }
 
-    pub fn load_wavs(&mut self, wavs: &[&str]) {
-        debug!("Load Wavs");
-        for wav in wavs {
-            self.resource_manager
-                .load_wav(wav.to_string(), self.resource_send.clone());
-            self.loading_files.insert(wav.to_string());
+    pub fn update(&mut self) {
+        // Check for new messages
+        while let Ok(message) = self.message_rec.try_recv() {
+            match message {
+                AudioMessage::Load(s) => self.load_wav(&s),
+                AudioMessage::Unload(s) => self.unload_wav(&s),
+                AudioMessage::TrackAction(ta) => self.mixer_sender.send(ta).unwrap(),
+            }
         }
-    }
 
-    pub fn unload_wav(&mut self, wav: &str) {
-        self.sender.send(AudioAction::Cleanup(wav.to_string())).unwrap();
-        self.loaded_files.remove(wav);
-        // This may happen before the track is cleaned up
-        self.wavs.write().unwrap().remove(wav);
-    }
-
-    pub fn loaded_check(&mut self) -> (usize, usize) {
+        // Check for loading files
         if !self.loading_files.is_empty() {
             let mut new_wavs = Vec::with_capacity(self.loading_files.len());
             while let Ok((file, res)) = self.resource_rec.try_recv() {
@@ -112,28 +108,45 @@ impl AudioManager {
                 }
             }
         }
+    }
+
+    fn load_wav(&mut self, wav: &str) {
+        debug!("Load Wavs");
+        self.resource_manager
+            .load_wav(wav.to_string(), self.resource_send.clone());
+        self.loading_files.insert(wav.to_string());
+    }
+
+    pub fn unload_wav(&mut self, wav: &str) {
+        self.mixer_sender.send(TrackAction::Cleanup(wav.to_string())).unwrap();
+        self.loaded_files.remove(wav);
+        // This may happen before the track is cleaned up
+        self.wavs.write().unwrap().remove(wav);
+    }
+
+    pub fn loaded_check(&self) -> (usize, usize) {
         (self.loading_files.len(), self.loaded_files.len())
     }
 
-    pub fn get_sender(&self) -> Sender<AudioAction> {
-        self.sender.clone()
+    pub fn get_sender(&self) -> Sender<TrackAction> {
+        self.mixer_sender.clone()
     }
 
     pub fn cleanup(&self) {
-        self.sender.send(AudioAction::ShutdownThread).unwrap();
+        self.mixer_sender.send(TrackAction::ShutdownThread).unwrap();
     }
 }
 
 struct Mixer {
     device: Device,
     config: SupportedStreamConfig,
-    receiver: Receiver<AudioAction>,
+    receiver: Receiver<TrackAction>,
     wavs: Arc<RwLock<HashMap<String, Wav>>>,
 }
 
 impl Mixer {
     fn new(
-        receiver: Receiver<AudioAction>,
+        receiver: Receiver<TrackAction>,
         device: Device,
         config: SupportedStreamConfig,
         wavs: Arc<RwLock<HashMap<String, Wav>>>,
@@ -171,7 +184,7 @@ impl Mixer {
         let seconds_per_sample = 1.0 / sample_rate;
         let channels = config.channels as usize;
 
-        let (sender, receiver) = mpsc::channel::<AudioAction>();
+        let (sender, receiver) = mpsc::channel::<TrackAction>();
         let wavs = self.wavs.clone();
         let mut tracks: HashMap<String, Track> = HashMap::new();
         let mut next_value =
@@ -194,7 +207,7 @@ impl Mixer {
         stream.play().unwrap();
 
         let mut last_message = self.receiver.recv().unwrap();
-        while last_message != AudioAction::ShutdownThread {
+        while last_message != TrackAction::ShutdownThread {
             debug!(
                 last_message = format!("{:?}", last_message),
                 "last audio message"
@@ -206,7 +219,7 @@ impl Mixer {
 
     fn get_next_audio_value(
         wavs: &Arc<RwLock<HashMap<String, Wav>>>,
-        receiver: &Receiver<AudioAction>,
+        receiver: &Receiver<TrackAction>,
         tracks: &mut HashMap<String, Track>,
         seconds_per_sample: &f64,
     ) -> f32 {
@@ -266,8 +279,15 @@ where
     }
 }
 
+#[derive(Debug)]
+pub enum AudioMessage {
+    Load(String),
+    Unload(String),
+    TrackAction(TrackAction),
+}
+
 #[derive(Debug, PartialEq)]
-pub enum AudioAction {
+pub enum TrackAction {
     Play(String),
     Stop(String),
     Reset(String),
@@ -288,9 +308,9 @@ enum TrackState {
     Slow,
 }
 
-fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) {
+fn update_track_state(tracks: &mut HashMap<String, Track>, action: TrackAction) {
     match action {
-        AudioAction::Reset(track) => {
+        TrackAction::Reset(track) => {
             tracks.insert(
                 track,
                 Track {
@@ -299,7 +319,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) 
                 },
             );
         }
-        AudioAction::Play(track) => match tracks.get_mut(track.as_str()) {
+        TrackAction::Play(track) => match tracks.get_mut(track.as_str()) {
             Some(t) => t.state = TrackState::Playing,
             None => {
                 tracks.insert(
@@ -311,7 +331,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) 
                 );
             }
         },
-        AudioAction::Slow(track) => match tracks.get_mut(track.as_str()) {
+        TrackAction::Slow(track) => match tracks.get_mut(track.as_str()) {
             Some(t) => t.state = TrackState::Slow,
             None => {
                 tracks.insert(
@@ -323,7 +343,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) 
                 );
             }
         },
-        AudioAction::Stop(track) => match tracks.get_mut(track.as_str()) {
+        TrackAction::Stop(track) => match tracks.get_mut(track.as_str()) {
             Some(t) => t.state = TrackState::Stopped,
             None => {
                 tracks.insert(
@@ -335,7 +355,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: AudioAction) 
                 );
             }
         },
-        AudioAction::Cleanup(track) => { tracks.remove(&track); },
-        AudioAction::ShutdownThread => (),
+        TrackAction::Cleanup(track) => { tracks.remove(&track); },
+        TrackAction::ShutdownThread => (),
     }
 }

@@ -17,7 +17,7 @@ extern crate tracing_subscriber;
 
 use std::time::Instant;
 
-use state::Game;
+use state::game::Game;
 use tracing::{debug, Level};
 
 fn main() {
@@ -35,12 +35,14 @@ fn main() {
     debug!("Game Initialized");
 
     let mut last_time = Instant::now();
-    while !game.status.ended() {
+    loop {
         let current_time = Instant::now();
         let delta_time = current_time.duration_since(last_time);
         last_time = current_time;
 
-        game = game.update(delta_time);
+        if !game.update(delta_time) {
+            break;
+        }
     }
     debug!("Game Closed")
 }

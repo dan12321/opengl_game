@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::ptr;
 
 use crate::shader::{create_shader, OpenGLError};
-use crate::state::PointLight;
+use crate::state::scenes::PointLight;
 
 use gl;
 use gl::types::*;

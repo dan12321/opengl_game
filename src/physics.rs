@@ -1,4 +1,4 @@
-use super::state::XYZ;
+use super::state::scenes::XYZ;
 
 pub struct Sides {
     front: f32,
