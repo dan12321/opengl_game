@@ -148,7 +148,6 @@ impl Renderer {
         while let Ok(message) = self.message_rec.try_recv() {
             match message {
                 RenderMessage::Load(s) => self.load_model(s),
-                RenderMessage::Unload(_) => (),
             }
         }
         // Check loading
@@ -287,5 +286,4 @@ fn clear() {
 
 pub enum RenderMessage {
     Load(String),
-    Unload(String),
 }

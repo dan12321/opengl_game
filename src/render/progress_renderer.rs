@@ -49,7 +49,7 @@ impl ProgressRenderer {
                     ptr::null_mut(),
                     message.as_mut_ptr() as *mut GLchar,
                 );
-                return Err(OpenGLError::FailedToLinkProgram(String::from_utf8(message)));
+                return Err(OpenGLError::link_program_error(&message));
             }
             gl::DeleteShader(vert);
             gl::DeleteShader(frag);

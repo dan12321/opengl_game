@@ -1,8 +1,10 @@
+use std::error::Error;
 use std::ffi::CString;
+use std::fmt::Display;
 use std::fs::OpenOptions;
 use std::io::{Error as IoError, Read};
 use std::path::PathBuf;
-use std::string::FromUtf8Error;
+use std::str::Utf8Error;
 use std::{ptr, str};
 
 use tracing::error;
@@ -45,22 +47,52 @@ pub unsafe fn create_shader(
             error_buffer.as_mut_ptr() as *mut GLchar,
         );
         let path = shader_path.to_str().unwrap_or("Invalid Unicode");
+        let message = match str::from_utf8(&error_buffer) {
+            Ok(m) => m,
+            Err(e) => return Err(OpenGLError::FailedToReadFailToCompileError(e)),
+        };
         error!(
-            message = str::from_utf8(&error_buffer).unwrap(),
+            message = message,
             shader = path,
             "failed_to_compile_shader"
         );
-        return Err(OpenGLError::FailedToCompileShader);
+        return Err(OpenGLError::FailedToCompileShader(message.to_string()));
     }
     Ok(shader)
 }
 
 #[derive(Debug)]
 pub enum OpenGLError {
-    FailedToCompileShader,
+    FailedToReadFailToCompileError(Utf8Error),
+    FailedToCompileShader(String),
     FailedToReadShader(IoError),
-    FailedToLinkProgram(Result<String, FromUtf8Error>),
+    FailedToLinkProgram(String),
+    FailedToReadLinkProgramError(Utf8Error),
 }
+
+impl OpenGLError {
+    pub fn link_program_error(error_buffer: &Vec<u8>) -> Self {
+        let message = match str::from_utf8(error_buffer) {
+            Ok(m) => m,
+            Err(e) => return OpenGLError::FailedToReadLinkProgramError(e),
+        };
+        OpenGLError::FailedToLinkProgram(message.to_string())
+    }
+}
+
+impl Display for OpenGLError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FailedToReadFailToCompileError(e) => write!(f, "Could not parse fail to compile error: {}", e),
+            Self::FailedToCompileShader(s) => write!(f, "Could not compile shader: {}", s),
+            Self::FailedToReadShader(e) => write!(f, "Could not read shader: {}", e),
+            Self::FailedToLinkProgram(s) => write!(f, "Failed to link program: {}", s),
+            Self::FailedToReadLinkProgramError(e) => write!(f, "Could not parse link program error: {}", e),
+        }
+    }
+}
+
+impl Error for OpenGLError {}
 
 #[derive(Debug, Copy, Clone)]
 pub struct PointLight {

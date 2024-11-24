@@ -7,7 +7,6 @@ use super::manager::Loadable;
 
 #[derive(Debug)]
 pub struct Map {
-    pub version: u64,
     pub bpm: f32,
     pub subdivisions: f32,
     pub start_offset: f32,
@@ -24,7 +23,7 @@ impl Loadable for Map {
         let mut buf = String::new();
         file.read_to_string(&mut buf)?;
         let mut lines = buf.lines().filter(|l| !l.starts_with("//"));
-        let version: u64 = lines
+        let _: u64 = lines
             .next()
             .ok_or(MapError::MissingVersion)?
             .trim()
@@ -41,7 +40,6 @@ impl Loadable for Map {
         let beats: Vec<(bool, bool, bool)> = lines.map(|s| parse_map_line(s)).collect();
 
         Ok(Map {
-            version,
             bpm: metadata_parts[0],
             subdivisions: metadata_parts[1],
             start_offset: metadata_parts[2],

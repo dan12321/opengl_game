@@ -1,6 +1,6 @@
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::{self, Sender};
-use std::thread::{self, JoinHandle};
+use std::thread;
 
 use anyhow::Result;
 
@@ -12,21 +12,19 @@ use super::model::{Material, Model, Texture};
 pub struct ResourceManager {
     req_sender: Sender<DataReq>,
     shutdown_sender: Sender<()>,
-    io_thread: Option<JoinHandle<()>>,
 }
 
 impl ResourceManager {
     pub fn new() -> Self {
         let (req_sender, req_receiver) = mpsc::channel::<DataReq>();
         let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
-        let io_thread = thread::spawn(move || {
+        let _ = thread::spawn(move || {
             run_io(req_receiver, shutdown_receiver);
         });
 
         Self {
             req_sender,
             shutdown_sender,
-            io_thread: Some(io_thread),
         }
     }
 

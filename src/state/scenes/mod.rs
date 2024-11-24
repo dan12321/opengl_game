@@ -3,13 +3,12 @@ pub mod loading;
 
 use std::{
     sync::{
-        mpsc::{Receiver, Sender},
+        mpsc::Sender,
         Arc,
     },
     time::Duration,
 };
 
-use anyhow::Result;
 use level::SceneState;
 use loading::LoadingState;
 use na::Matrix4;
@@ -21,19 +20,15 @@ use crate::{
     },
     controller::Controller,
     render::{RenderMessage, Renderer},
-    resource::{manager::ResourceManager, map::Map},
+    resource::manager::ResourceManager,
     shader,
 };
-
-use super::game::Game;
 
 pub struct SceneManager {
     scene: Scene,
     resource_manager: Arc<ResourceManager>,
-    scene_resources: Option<SceneResources>,
     maps: Vec<String>,
     audio_send: Sender<AudioMessage>,
-    render_send: Sender<RenderMessage>,
 }
 
 enum Scene {
@@ -66,11 +61,9 @@ impl SceneManager {
         let loading = LoadingState::new(&resource_manager, maps[0].clone(), audio_send.clone());
         Self {
             resource_manager,
-            scene_resources: None,
             maps,
             scene: Scene::Loading(loading),
             audio_send,
-            render_send,
         }
     }
 
@@ -124,10 +117,6 @@ impl SceneManager {
             }),
         }
     }
-}
-
-pub struct SceneResources {
-    pub music: Option<String>,
 }
 
 #[derive(Clone, Debug)]

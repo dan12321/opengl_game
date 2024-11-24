@@ -1,25 +1,18 @@
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::Arc;
+use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-use anyhow::Result;
-use glfw::{Context, Window};
 use na::{vector, Matrix4};
-use tracing::debug;
 
-use crate::audio::{AudioManager, AudioMessage, TrackAction};
+use crate::audio::{AudioMessage, TrackAction};
 use crate::camera::Camera;
 use crate::config::{
     self, BACKPACK_MODEL, BEAT_SIZE, COLUMN_WIDTH, CUBE_MODEL, DEATH_TRACK, PLANE_LENGTH,
-    PLANE_MODEL, PLANE_WIDTH, SAD_MAP, UPBEAT_MAP,
+    PLANE_MODEL, PLANE_WIDTH,
 };
 use crate::controller::{Button, Controller};
 use crate::physics::AABBColider;
-use crate::render::Renderer;
-use crate::resource::{manager::ResourceManager, map::Map};
-use crate::shader;
+use crate::resource::map::Map;
 use crate::shader::DirLight;
-use crate::state::game::Game;
 
 use super::{GameObject, Plane, Player, PointLight, Transform};
 

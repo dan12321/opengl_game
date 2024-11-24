@@ -1,33 +1,20 @@
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
 use glfw::{Context, Window};
-use na::{vector, Matrix4};
-use tracing::debug;
 
-use super::scenes::level::SceneState;
 use super::scenes::SceneManager;
-use crate::audio::{AudioManager, TrackAction};
-use crate::camera::Camera;
-use crate::config::{
-    self, BACKPACK_MODEL, BEAT_SIZE, COLUMN_WIDTH, CUBE_MODEL, DEATH_TRACK, PLANE_LENGTH,
-    PLANE_MODEL, PLANE_WIDTH, SAD_MAP, UPBEAT_MAP,
-};
+use crate::audio::AudioManager;
 use crate::controller::{Button, Controller};
-use crate::physics::AABBColider;
 use crate::render::Renderer;
-use crate::resource::{manager::ResourceManager, map::Map};
-use crate::shader;
-use crate::shader::DirLight;
+use crate::resource::manager::ResourceManager;
 
 pub struct Game {
     pub audio_manager: AudioManager,
     pub renderer: Renderer,
     resource_manager: Arc<ResourceManager>,
     pub controller: Controller,
-    map_loading: Option<Map>,
     pub scene_manager: SceneManager,
     pub window: Window,
 }
@@ -78,7 +65,6 @@ impl Game {
         Self {
             audio_manager,
             resource_manager,
-            map_loading: None,
             renderer,
             window,
             controller,

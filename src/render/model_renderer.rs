@@ -59,9 +59,7 @@ impl ModelRenderer {
                     ptr::null_mut(),
                     error_buffer.as_mut_ptr() as *mut GLchar,
                 );
-                return Err(OpenGLError::FailedToLinkProgram(String::from_utf8(
-                    error_buffer,
-                )));
+                return Err(OpenGLError::link_program_error(&error_buffer));
             }
             gl::DeleteShader(vert);
             gl::DeleteShader(frag);

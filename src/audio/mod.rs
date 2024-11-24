@@ -10,7 +10,7 @@ use cpal::{
     Device, FromSample, Sample, SizedSample, StreamConfig, SupportedStreamConfig,
 };
 
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 
 use crate::resource::manager::ResourceManager;
 
@@ -26,7 +26,7 @@ pub struct AudioManager {
     message_rec: Receiver<AudioMessage>,
     loading_files: HashSet<String>,
     loaded_files: HashSet<String>,
-    audio_thread: JoinHandle<()>,
+    audio_thread: Option<JoinHandle<()>>,
 }
 
 impl AudioManager {
@@ -51,10 +51,10 @@ impl AudioManager {
         let wavs = Arc::new(RwLock::new(HashMap::new()));
         let audio_thread_wavs = wavs.clone();
 
-        let audio_thread = thread::spawn(move || {
+        let audio_thread = Some(thread::spawn(move || {
             let mut audio_thread = Mixer::new(receiver, device, config.into(), audio_thread_wavs);
             audio_thread.run();
-        });
+        }));
 
         let (resource_send, resource_rec) = mpsc::channel::<(String, Result<Wav>)>();
         let loading_files = std::collections::HashSet::new();
@@ -78,7 +78,6 @@ impl AudioManager {
         while let Ok(message) = self.message_rec.try_recv() {
             match message {
                 AudioMessage::Load(s) => self.load_wav(&s),
-                AudioMessage::Unload(s) => self.unload_wav(&s),
                 AudioMessage::TrackAction(ta) => self.mixer_sender.send(ta).unwrap(),
             }
         }
@@ -112,28 +111,32 @@ impl AudioManager {
 
     fn load_wav(&mut self, wav: &str) {
         debug!("Load Wavs");
+        if self.loaded_files.contains(wav) {
+            return;
+        }
         self.resource_manager
             .load_wav(wav.to_string(), self.resource_send.clone());
         self.loading_files.insert(wav.to_string());
     }
 
-    pub fn unload_wav(&mut self, wav: &str) {
-        self.mixer_sender.send(TrackAction::Cleanup(wav.to_string())).unwrap();
-        self.loaded_files.remove(wav);
-        // This may happen before the track is cleaned up
-        self.wavs.write().unwrap().remove(wav);
-    }
+    //pub fn unload_wav(&mut self, wav: &str) {
+    //    self.mixer_sender.send(TrackAction::Cleanup(wav.to_string())).unwrap();
+    //    self.loaded_files.remove(wav);
+    //    // This may happen before the track is cleaned up
+    //    self.wavs.write().unwrap().remove(wav);
+    //}
 
     pub fn loaded_check(&self) -> (usize, usize) {
         (self.loading_files.len(), self.loaded_files.len())
     }
 
-    pub fn get_sender(&self) -> Sender<TrackAction> {
-        self.mixer_sender.clone()
-    }
-
-    pub fn cleanup(&self) {
+    pub fn cleanup(&mut self) {
         self.mixer_sender.send(TrackAction::ShutdownThread).unwrap();
+        if let Some(thread) = self.audio_thread.take() {
+            thread.join().unwrap();
+        } else {
+            warn!("No audio thread on cleanup");
+        }
     }
 }
 
@@ -282,7 +285,6 @@ where
 #[derive(Debug)]
 pub enum AudioMessage {
     Load(String),
-    Unload(String),
     TrackAction(TrackAction),
 }
 
@@ -292,7 +294,7 @@ pub enum TrackAction {
     Stop(String),
     Reset(String),
     Slow(String),
-    Cleanup(String),
+    //Cleanup(String),
     ShutdownThread,
 }
 
@@ -355,7 +357,7 @@ fn update_track_state(tracks: &mut HashMap<String, Track>, action: TrackAction) 
                 );
             }
         },
-        TrackAction::Cleanup(track) => { tracks.remove(&track); },
+        // TrackAction::Cleanup(track) => { tracks.remove(&track); },
         TrackAction::ShutdownThread => (),
     }
 }

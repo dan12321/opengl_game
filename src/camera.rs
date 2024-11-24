@@ -4,7 +4,6 @@ use na::{vector, Matrix4, Rotation3, Translation3, Vector3};
 #[derive(Debug)]
 pub struct Camera {
     pub distance: GLfloat,
-    pub default_distance: GLfloat,
     pub longitude: GLfloat,
     pub latitude: GLfloat,
     pub target: Vector3<GLfloat>,
@@ -19,7 +18,6 @@ impl Camera {
     ) -> Self {
         Self {
             distance: default_distance,
-            default_distance,
             longitude,
             latitude,
             target,

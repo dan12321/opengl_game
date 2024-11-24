@@ -12,7 +12,6 @@ pub struct Wav {
     // If memory becomes an issue a VecDequeue should be used
     pub samples: Vec<f64>,
     pub sample_rate: u32,
-    pub sample_size: u32,
 }
 
 impl Loadable for Wav {
@@ -70,7 +69,6 @@ impl Loadable for Wav {
         Ok(Wav {
             samples,
             sample_rate,
-            sample_size: bytes_per_second / sample_rate,
         })
     }
 }
@@ -113,4 +111,3 @@ impl Display for ParseWavError {
 }
 
 impl Error for ParseWavError {}
-
