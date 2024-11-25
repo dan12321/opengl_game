@@ -87,7 +87,7 @@ impl SceneManager {
                 }
             }
             Scene::Loading(l) => {
-                l.update(audio_manager, renderer);
+                l.update(delta_time, audio_manager, renderer);
                 if let Some(level) = l.level.take() {
                     self.scene = Scene::Level(level);
                 }

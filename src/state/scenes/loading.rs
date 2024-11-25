@@ -1,7 +1,7 @@
-use std::sync::{
+use std::{sync::{
     mpsc::{self, Sender},
     Arc,
-};
+}, time::Duration};
 
 use anyhow::Result;
 use tracing::debug;
@@ -42,9 +42,13 @@ impl LoadingState {
         }
     }
 
-    pub fn update(&mut self, audio_manager: &AudioManager, renderer: &Renderer) {
+    pub fn update(&mut self, delta_time: &Duration, audio_manager: &AudioManager, renderer: &Renderer) {
+        // timing properties
+        let dt = delta_time.as_secs_f32();
+        let percent_per_second = 0.1;
+        let displacement = percent_per_second * dt;
         if self.progress < 0.1 {
-            self.progress += 0.0001;
+            self.progress += displacement;
         }
         if self.map.is_none() {
             let Ok((_, map)) = self.map_receiver.try_recv() else {
@@ -60,7 +64,7 @@ impl LoadingState {
             self.map = Some(map);
             debug!("Map Loaded");
             if self.progress < 0.1 {
-                self.progress = 0.11;
+                self.progress = 0.1;
             }
         }
 
@@ -69,17 +73,17 @@ impl LoadingState {
 
         if loading_audio + loading_models == 0 {
             // TODO: Base this on delta time instead of being frame rate dependant
-            self.progress += 0.0001;
+            self.progress += displacement;
         } else {
             let loaded_assets = loaded_audio + loaded_models;
             let loading_total = loaded_assets + loading_audio + loading_models;
             let target_progress = 0.1 + 0.9 * (loaded_assets as f32 / loading_total as f32);
             let mut delta = target_progress - self.progress;
             delta = f32::max(delta, 0.0);
-            self.progress += delta * delta / 600.0;
+            self.progress += delta * delta * dt;
         }
         // We want a chance for this to be full
-        if self.progress <= 1.2 {
+        if self.progress <= 1.0 + percent_per_second / 2.0 {
             return;
         }
 
