@@ -45,7 +45,7 @@ impl LoadingState {
     pub fn update(&mut self, delta_time: &Duration, audio_manager: &AudioManager, renderer: &Renderer) {
         // timing properties
         let dt = delta_time.as_secs_f32();
-        let percent_per_second = 0.1;
+        let percent_per_second = 0.4;
         let displacement = percent_per_second * dt;
         if self.progress < 0.1 {
             self.progress += displacement;

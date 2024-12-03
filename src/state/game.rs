@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -16,6 +17,7 @@ pub struct Game {
     resource_manager: Arc<ResourceManager>,
     pub controller: Controller,
     pub scene_manager: SceneManager,
+    quit: Receiver<()>,
     pub window: Window,
 }
 
@@ -41,8 +43,9 @@ impl Game {
         window.make_current();
         window.set_resizable(false);
         window.set_key_polling(true);
+        window.set_mouse_button_polling(true);
         window.set_cursor_pos_polling(true);
-        window.set_cursor_mode(glfw::CursorMode::Disabled);
+        window.set_cursor_mode(glfw::CursorMode::Normal);
         window.set_raw_mouse_motion(true);
         window.set_scroll_polling(true);
 
@@ -59,7 +62,8 @@ impl Game {
         let (render_send, render_rec) = mpsc::channel();
         let renderer = Renderer::new(resource_manager.clone(), render_rec);
         // Initialising this will start loading the base resources
-        let scene_manager = SceneManager::new(resource_manager.clone(), audio_send, render_send);
+        let (quit_sender, quit_receiver) = mpsc::channel();
+        let scene_manager = SceneManager::new(resource_manager.clone(), audio_send, render_send, quit_sender);
 
         // Start loading base resources
         Self {
@@ -69,6 +73,7 @@ impl Game {
             window,
             controller,
             scene_manager,
+            quit: quit_receiver,
         }
     }
 
@@ -77,7 +82,7 @@ impl Game {
         self.controller.poll_input(&mut self.window);
 
         // Game Logic
-        if self.controller.buttons().contains(&Button::Quit) {
+        if self.quit.try_recv().is_ok() {
             // These should "take" the resource but can't with how this is written.
             self.audio_manager.cleanup();
             self.resource_manager.cleanup();

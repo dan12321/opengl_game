@@ -30,6 +30,7 @@ pub struct SceneState {
     player_state: PlayerStatus,
     audio_sender: Sender<AudioMessage>,
     pub change_scene: Option<usize>,
+    pub menu: bool,
 }
 
 impl SceneState {
@@ -96,13 +97,17 @@ impl SceneState {
             audio_sender,
             paused: false,
             change_scene: None,
+            menu: false,
         };
 
-        scene.play();
+        scene.reset();
         scene
     }
 
     pub fn update(&mut self, delta_time: &Duration, controller: &Controller) {
+        if controller.buttons().contains(&Button::Quit) {
+            self.escape();
+        }
         if self.paused {
             self.pause_update(controller);
         } else {
@@ -367,6 +372,13 @@ impl SceneState {
         let message = AudioMessage::TrackAction(action);
         self.audio_sender.send(message).unwrap();
         self.paused = false;
+    }
+
+    fn escape(&mut self) {
+        let action = TrackAction::Stop(self.map.music.clone());
+        let message = AudioMessage::TrackAction(action);
+        self.audio_sender.send(message).unwrap();
+        self.menu = true;
     }
 
     fn pause(&mut self) {

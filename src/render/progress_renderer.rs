@@ -4,10 +4,11 @@ use std::path::PathBuf;
 use std::ptr;
 
 use crate::shader::{create_shader, OpenGLError};
-use crate::state::scenes::ProgressBar;
+use crate::state::scenes::UiElement;
 
 use gl;
 use gl::types::*;
+use tracing::debug;
 
 pub struct ProgressRenderer {
     shader_id: u32,
@@ -15,6 +16,8 @@ pub struct ProgressRenderer {
     base_color_uniform: i32,
     progress_color_uniform: i32,
     progress_uniform: i32,
+    merge_color_uniform: i32,
+    merge_amount_uniform: i32,
     transformation_uniform: i32,
     indices: Vec<u32>,
 }
@@ -82,9 +85,11 @@ impl ProgressRenderer {
             gl::EnableVertexAttribArray(0);
 
             // Get Uniforms
-            let progress_color_uniform = gl::GetUniformLocation(program, PROGRESS_COLOR.as_ptr());
             let base_color_uniform = gl::GetUniformLocation(program, BASE_COLOR.as_ptr());
+            let progress_color_uniform = gl::GetUniformLocation(program, PROGRESS_COLOR.as_ptr());
             let progress_uniform = gl::GetUniformLocation(program, PROGRESS.as_ptr());
+            let merge_color_uniform = gl::GetUniformLocation(program, MERGE_COLOR.as_ptr());
+            let merge_amount_uniform = gl::GetUniformLocation(program, MERGE_AMOUNT.as_ptr());
             let transformation_uniform = gl::GetUniformLocation(program, TRANSFORMATION.as_ptr());
 
             Ok(Self {
@@ -93,13 +98,15 @@ impl ProgressRenderer {
                 base_color_uniform,
                 progress_color_uniform,
                 progress_uniform,
+                merge_color_uniform,
+                merge_amount_uniform,
                 transformation_uniform,
                 indices: Vec::from(indices),
             })
         }
     }
 
-    pub fn draw(&self, bar: ProgressBar) {
+    pub fn draw(&self, bars: Vec<UiElement>) {
         unsafe {
             gl::UseProgram(self.shader_id);
             gl::BindVertexArray(self.vao);
@@ -109,26 +116,31 @@ impl ProgressRenderer {
                 &self.indices[0] as *const _ as *const c_void,
                 gl::STATIC_DRAW,
             );
-            let transform = bar.transform.to_matrix4();
-            gl::UniformMatrix4fv(
-                self.transformation_uniform,
-                1,
-                gl::FALSE,
-                transform.as_ptr(),
-            );
+            for bar in bars {
+                let transform = bar.transform.to_matrix4();
+                gl::UniformMatrix4fv(
+                    self.transformation_uniform,
+                    1,
+                    gl::FALSE,
+                    transform.as_ptr(),
+                );
 
-            let (r, g, b) = bar.base_color;
-            gl::Uniform3f(self.base_color_uniform, r, g, b);
-            let (r, g, b) = bar.progress_color;
-            gl::Uniform3f(self.progress_color_uniform, r, g, b);
-            gl::Uniform1f(self.progress_uniform, bar.progress);
+                let (r, g, b) = bar.base_color;
+                gl::Uniform3f(self.base_color_uniform, r, g, b);
+                let (r, g, b) = bar.progress_color;
+                gl::Uniform3f(self.progress_color_uniform, r, g, b);
+                gl::Uniform1f(self.progress_uniform, bar.progress);
+                let (r, g, b) = bar.merge_color;
+                gl::Uniform3f(self.merge_color_uniform, r, g, b);
+                gl::Uniform1f(self.merge_amount_uniform, bar.merge_amount);
 
-            gl::DrawElements(
-                gl::TRIANGLES,
-                self.indices.len() as i32,
-                gl::UNSIGNED_INT,
-                ptr::null(),
-            );
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    self.indices.len() as i32,
+                    gl::UNSIGNED_INT,
+                    ptr::null(),
+                );
+            }
         }
     }
 }
@@ -139,3 +151,5 @@ const PROGRESS: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"p
 const PROGRESS_COLOR: &'static CStr =
     unsafe { CStr::from_bytes_with_nul_unchecked(b"progress_color\0") };
 const BASE_COLOR: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"base_color\0") };
+const MERGE_COLOR: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"merge_color\0") };
+const MERGE_AMOUNT: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"merge_amount\0") };

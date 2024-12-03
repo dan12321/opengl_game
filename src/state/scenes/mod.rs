@@ -1,5 +1,6 @@
 pub mod level;
 pub mod loading;
+pub mod menu;
 
 use std::{
     sync::{
@@ -11,6 +12,7 @@ use std::{
 
 use level::SceneState;
 use loading::LoadingState;
+use menu::MenuState;
 use na::Matrix4;
 
 use crate::{
@@ -29,11 +31,13 @@ pub struct SceneManager {
     resource_manager: Arc<ResourceManager>,
     maps: Vec<String>,
     audio_send: Sender<AudioMessage>,
+    quit_send: Sender<()>,
 }
 
 enum Scene {
     Level(SceneState),
     Loading(LoadingState),
+    Menu(MenuState),
 }
 
 impl SceneManager {
@@ -41,6 +45,7 @@ impl SceneManager {
         resource_manager: Arc<ResourceManager>,
         audio_send: Sender<AudioMessage>,
         render_send: Sender<RenderMessage>,
+        quit_send: Sender<()>,
     ) -> Self {
         let maps = vec![SAD_MAP.to_string(), UPBEAT_MAP.to_string()];
 
@@ -57,13 +62,14 @@ impl SceneManager {
         for model in global_models {
             render_send.send(RenderMessage::Load(model)).unwrap();
         }
-
-        let loading = LoadingState::new(&resource_manager, maps[0].clone(), audio_send.clone());
+        let menu = MenuState::new(quit_send.clone());
+        //let loading = LoadingState::new(&resource_manager, maps[0].clone(), audio_send.clone());
         Self {
             resource_manager,
             maps,
-            scene: Scene::Loading(loading),
+            scene: Scene::Menu(menu),
             audio_send,
+            quit_send,
         }
     }
 
@@ -77,7 +83,10 @@ impl SceneManager {
         match &mut self.scene {
             Scene::Level(l) => {
                 l.update(delta_time, controller);
-                if let Some(s) = l.change_scene {
+                if l.menu {
+                    let menu = MenuState::new(self.quit_send.clone());
+                    self.scene = Scene::Menu(menu);
+                } else if let Some(s) = l.change_scene {
                     let loading = LoadingState::new(
                         &self.resource_manager,
                         self.maps[s].clone(),
@@ -91,6 +100,13 @@ impl SceneManager {
                 if let Some(level) = l.level.take() {
                     self.scene = Scene::Level(level);
                 }
+            },
+            Scene::Menu(m) => {
+                m.update(delta_time, controller);
+                if let Some(map) = &m.loading_scene {
+                    let loading = LoadingState::new(&self.resource_manager, map.clone(), self.audio_send.clone());
+                    self.scene = Scene::Loading(loading);
+                }
             }
         }
     }
@@ -99,13 +115,14 @@ impl SceneManager {
         match &self.scene {
             Scene::Level(l) => Some(l),
             Scene::Loading(_) => None,
+            Scene::Menu(_) => None,
         }
     }
 
-    pub fn get_progress_bar(&self) -> Option<ProgressBar> {
+    pub fn get_ui_elements(&self) -> Vec<UiElement> {
         match &self.scene {
-            Scene::Level(_) => None,
-            Scene::Loading(l) => Some(ProgressBar {
+            Scene::Level(_) => Vec::new(),
+            Scene::Loading(l) => vec![UiElement {
                 transform: Transform {
                     position: (-0.5, -0.5, 0.0).into(),
                     scale: (1.0, 0.2, 1.0).into(),
@@ -114,7 +131,10 @@ impl SceneManager {
                 base_color: (0.0, 0.3, 0.7),
                 progress_color: (0.0, 0.7, 1.0),
                 progress: f32::min(l.progress, 1.0),
-            }),
+                merge_color: (0.0, 0.0, 0.0),
+                merge_amount: 0.0,
+            }],
+            Scene::Menu(m) => m.get_ui_elements(),
         }
     }
 }
@@ -134,11 +154,13 @@ pub struct PointLight {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct ProgressBar {
+pub struct UiElement {
     pub transform: Transform,
     pub base_color: (f32, f32, f32),
     pub progress_color: (f32, f32, f32),
     pub progress: f32,
+    pub merge_color: (f32, f32, f32),
+    pub merge_amount: f32,
 }
 
 impl PointLight {

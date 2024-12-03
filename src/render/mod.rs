@@ -193,9 +193,8 @@ impl Renderer {
             );
         }
 
-        if let Some(progress) = scene_manager.get_progress_bar() {
-            self.progress.draw(progress);
-        }
+        let ui_elements = scene_manager.get_ui_elements();
+        self.progress.draw(ui_elements);
     }
 
     fn loading_update(&mut self) {
