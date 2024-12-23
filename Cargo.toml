@@ -15,3 +15,4 @@ nalgebra = "0.31.4"
 rand = "0.8.5"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
+freetype-sys = { version = "0.21", features = ["bundled"] }

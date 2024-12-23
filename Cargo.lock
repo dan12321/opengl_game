@@ -347,6 +347,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "freetype-sys"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddb84abd9992afaa8eb9b8bef907a94553504d0a890924e1bf1f1ab1249455af"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -813,6 +824,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cpal",
+ "freetype-sys",
  "gl",
  "glfw",
  "image",
