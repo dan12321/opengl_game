@@ -112,8 +112,11 @@ provides a place for other systems to send commands to the audio channel
 - A Device that receives values from the mixer at a consistent rate.
 ### Rendering
 Draws objects and UI based on the current game state. Currently this does a draw
-per shader every frame. These shaders are split into object models, ui elements and
-light sources (there's no reason not to roll the light shader into the model shader).
+per renderer type every frame. These renderer types are split into object models, ui elements and
+light sources (these should be refactored to be done with the object models).
+
+The "renderer type" wraps the `unsafe` code making calls to OpenGL. In theory
+this should provide a safe interface but I'm still quite new to OpenGL.
 
 
 ### Game State
